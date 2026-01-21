@@ -1,0 +1,48 @@
+config:
+  target: "http://localhost:3000"
+  phases:
+    - duration: 90
+      arrivalRate: 10     # users/sec
+      maxVusers: 1000     # cap at 1000 concurrent
+  engines:
+    socketio: {}
+
+scenarios:
+  # 🐢 Slow users (mostly idle)
+  - name: slow-users
+    weight: 50
+    engine: socketio
+    flow:
+      - think: 10
+      - emit:
+          channel: "chat-message"
+          data: "slow hello"
+      - think: 15
+
+  # 🚶 Normal users
+  - name: normal-users
+    weight: 35
+    engine: socketio
+    flow:
+      - emit:
+          channel: "chat-message"
+          data: "normal hello"
+      - think: 3
+      - emit:
+          channel: "chat-message"
+          data: "normal followup"
+      - think: 5
+
+  # ⚡ Fast typers (bursts)
+  - name: fast-users
+    weight: 15
+    engine: socketio
+    flow:
+      - loop:
+          - emit:
+              channel: "chat-message"
+              data: "FAST MESSAGE"
+          - think: 0.25
+        count: 6
+      - think: 5
+

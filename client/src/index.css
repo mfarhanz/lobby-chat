@@ -1,0 +1,290 @@
+@config "../tailwind.config.js";
+
+@import "tailwindcss";
+
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #242424;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  body {
+    @apply bg-zinc-950 text-zinc-100 antialiased text-base;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  #turnstile-modal {
+    box-sizing: content-box;
+  }
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+@layer components {
+  .scrollbar-custom {
+    scrollbar-width: thin;
+    scrollbar-color: #000000 #1e1e1e;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: #1e1e1e;
+    border-radius: 9999px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: #000000;
+    border-radius: 9999px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: #4f4f4f;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+    width: 0;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  .app-shell {
+    @apply min-h-screen flex flex-col h-screen;
+  }
+
+  .app-header {
+    @apply px-6 py-4 text-2xl font-semibold tracking-tight;
+  }
+
+  .app-main {
+    @apply flex flex-1 gap-4 px-6 pb-6;
+    min-height: 0;
+  }
+
+  .chat-panel {
+    @apply flex flex-col flex-1 bg-zinc-800 rounded-xl p-4;
+  }
+
+  .users-panel {
+    @apply w-64 bg-zinc-800/70 rounded-xl p-4 space-y-2;
+  }
+
+  .user-item {
+    @apply flex items-center;
+    @apply rounded-md px-3 py-2;
+    @apply text-sm font-medium;
+    @apply bg-zinc-700/70;
+    @apply text-zinc-200;
+    @apply transition-colors;
+  }
+
+  .user-item:hover {
+    @apply bg-zinc-700;
+  }
+
+  .chat-messages {
+    @apply flex-1 overflow-y-auto rounded-lg bg-zinc-800 p-3 space-y-2;
+  }
+
+  .chat-message {
+    @apply rounded-md px-3 py-1.5 leading-relaxed;
+    @apply bg-zinc-800;
+  }
+
+  .chat-message-header {
+    @apply flex items-baseline gap-3;
+  }
+
+  .chat-message-username {
+    @apply font-semibold text-indigo-200;
+  }
+
+  .chat-message-time {
+    @apply text-xs text-zinc-500;
+  }
+
+  .chat-message-text {
+    @apply text-zinc-100 leading-relaxed;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* Markdown styles scoped to chat messages */
+  .chat-message-text p {
+    white-space: pre-wrap;
+    /* preserves newlines and returns in text */
+  }
+
+  .chat-message-text img {
+    @apply mt-2 mb-2 rounded-md max-h-[40vh] max-w-[50vw] w-auto h-auto;
+  }
+
+  .chat-message-text h1 {
+    @apply text-2xl font-bold mt-2 mb-1;
+  }
+
+  .chat-message-text h2 {
+    @apply text-xl font-semibold mt-2 mb-1;
+  }
+
+  .chat-message-text h3 {
+    @apply text-lg font-semibold mt-2 mb-1;
+  }
+
+  .chat-message-text blockquote {
+    @apply border-l-3 border-zinc-500 pl-4 italic text-zinc-300;
+  }
+
+  .chat-message-text ul,
+  .chat-message-text ol {
+    @apply ml-5 my-2 list-disc;
+  }
+
+  .chat-message-text ol {
+    @apply list-decimal;
+  }
+
+  .chat-message-text li {
+    @apply my-1;
+  }
+
+  .chat-message-text table {
+    @apply my-3 border border-zinc-700 rounded-lg overflow-hidden text-sm;
+    width: auto;
+    max-width: 90%;
+  }
+
+  .chat-message-text thead th {
+    @apply bg-zinc-800 text-amber-100 font-semibold text-center;
+    @apply px-3 py-2;
+  }
+
+  .chat-message-text tbody tr:nth-child(odd) td {
+    @apply bg-zinc-900;
+  }
+
+  .chat-message-text tbody tr:nth-child(even) td {
+    @apply bg-zinc-950;
+  }
+
+  .chat-message-text tbody td {
+    @apply text-zinc-100 text-center;
+    @apply px-3 py-2;
+  }
+
+  .chat-message-text tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .chat-input {
+    @apply flex-1 w-full rounded-lg bg-zinc-700/70 px-4 py-2 pr-28 max-h-70 z-5 resize-none overflow-y-auto;
+    @apply placeholder-zinc-400 outline-none;
+    @apply focus:ring-2 focus:ring-violet-500;
+  }
+
+  .chat-input-row {
+    @apply mt-1 flex items-center gap-2;
+  }
+
+  .chat-input-wrapper {
+    @apply relative flex flex-1 items-center;
+  }
+
+  .chat-input-icons {
+    @apply absolute right-3 bottom-1 z-5;
+    @apply flex items-center;
+  }
+
+  .chat-input-icon {
+    @apply text-zinc-400 text-sm;
+    @apply px-2 py-1 rounded-md;
+    @apply hover:bg-zinc-700 hover:text-zinc-100;
+    @apply transition-colors;
+    @apply outline-none border-none cursor-pointer;
+  }
+
+  .chat-input-icon:focus,
+  .chat-input-icon:focus-visible {
+    @apply outline-none ring-0;
+  }
+
+  .chat-send {
+    @apply rounded-lg px-3 py-2;
+    @apply bg-indigo-600 text-white;
+    @apply border-none outline-none ring-0 cursor-pointer;
+    @apply transition-colors;
+  }
+
+  .chat-send:hover:not(:disabled) {
+    @apply bg-purple-800/70;
+  }
+
+  .chat-send:focus,
+  .chat-send:focus-visible,
+  .chat-send:active {
+    @apply outline-none ring-0;
+  }
+
+  .chat-send:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+
+  .text-title {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+
+  .text-message {
+    @apply leading-relaxed;
+  }
+
+  .text-input {}
+
+  .text-meta {
+    @apply text-xs text-zinc-400;
+  }
+
+  .status-tooltip {
+    @apply absolute left-0 top-0 px-3 py-1 rounded-md bg-zinc-800 border border-zinc-700 text-sm text-indigo-400;
+    transform: translateY(0);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    white-space: nowrap;
+  }
+
+  .group:hover .status-tooltip {
+    opacity: 1;
+  }
+}
