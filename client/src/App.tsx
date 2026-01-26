@@ -6,12 +6,15 @@ import "./App.css";
 
 export default function App() {
   const {
+    connected,
+    activeConnections,
     messages,
     users,
-    activeConnections,
-    connected,
+    username,
     startChat,
     sendMessage,
+    editMessage,
+    deleteMessage,
   } = useChat();
 
   return (
@@ -24,11 +27,14 @@ export default function App() {
 
       <main className="app-main">
         <Chat
+          username={username}
           messages={messages}
           connected={connected}
           activeConnections={activeConnections}
           startChat={startChat}
           sendMessage={sendMessage}
+          editMessage={editMessage}
+          deleteMessage={deleteMessage}
         />
 
         <UsersPanel users={users} />

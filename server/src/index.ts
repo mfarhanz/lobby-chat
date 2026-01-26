@@ -3,6 +3,7 @@ import http from "http";
 import { Server, Socket } from "socket.io";
 import dotenv from "dotenv";
 import { generateUsername } from "./username";
+import { UserMeta, MessageMeta } from "./types/meta";
 
 dotenv.config();
 
@@ -21,9 +22,10 @@ const MAX_MESSAGE_LENGTH = 5000;
 const SPAM_THRESHOLD = 5; // max messages
 const SPAM_TIME = 10000; // 10 seconds
 
-const spamLimits: Record<string, number[]> = {};
 const connectionsPerIp: Record<string, number> = {};
-const usersBySocketId: Record<string, string> = {};
+// const spamLimits: Record<string, number[]> = {};
+// const usersBySocketId: Record<string, string> = {};
+const usersBySocketId: Record<string, UserMeta> = {};
 let activeConnections = 0;
 
 process.on("uncaughtException", (err: unknown) => {
@@ -88,33 +90,149 @@ io.use(async (socket: Socket & { _ip?: string }, next) => {
 io.on("connection", (socket: Socket & { _ip?: string }) => {
     activeConnections++;
     const username = generateUsername();
-    spamLimits[socket.id] = [];
-    usersBySocketId[socket.id] = username;
+
+    // spamLimits[socket.id] = [];
+    // usersBySocketId[socket.id] = username;
+    usersBySocketId[socket.id] = {
+        username,
+        recentSends: [],
+        messages: []
+    };
+
+    socket.emit("username", username);
     broadcastActiveConnections();
     broadcastUsers();
+
     console.log("User connected:", socket.id, username);
 
-    socket.on("chat-message", (msg: unknown) => {
-        if (typeof msg !== "string") return;
-        if (msg.length > MAX_MESSAGE_LENGTH) return;
-        const username = usersBySocketId[socket.id] || "Unknown";
-        const now = Date.now();
-        // Remove timestamps older than SPAM_TIME
-        spamLimits[socket.id] = spamLimits[socket.id].filter(t => now - t < SPAM_TIME);
-        // Add current timestamp
-        spamLimits[socket.id].push(now);
-        // Check if user is spamming
-        if (spamLimits[socket.id].length > SPAM_THRESHOLD) {
-            socket.emit("kicked", "You have been kicked for spamming.");
-            setTimeout(() => socket.disconnect(), 150); // disconnect after sending message
+    socket.on("send-message", (msg: unknown) => {
+        if (
+            typeof msg !== "object" ||
+            msg === null ||
+            !("text" in msg) ||
+            typeof (msg as any).text !== "string"
+        ) {
             return;
         }
 
+        const { text, replyTo } = msg as {
+            text: string;
+            replyTo?: {
+                id: string;
+                user: string;
+            };
+        };
+
+        let validatedReplyTo: {
+            id: string;
+            user: string;
+        } | undefined;
+
+        if (
+            replyTo &&
+            typeof replyTo === "object" &&
+            typeof replyTo.id === "string" &&
+            typeof replyTo.user === "string"
+        ) {
+            validatedReplyTo = {
+                id: replyTo.id,
+                user: replyTo.user,
+            };
+        }
+
+        if (text.length > MAX_MESSAGE_LENGTH) return;
+
+        // const username = usersBySocketId[socket.id] || "Anonymous";
+        const user = usersBySocketId[socket.id];
+        if (!user) return;
+
+        const now = Date.now();
+        const messageId = crypto.randomUUID();
+
+        // Remove timestamps older than SPAM_TIME
+        // spamLimits[socket.id] = spamLimits[socket.id].filter(t => now - t < SPAM_TIME);
+        user.recentSends = user.recentSends.filter(t => now - t < SPAM_TIME);
+        // Add current timestamp
+        // spamLimits[socket.id].push(now);
+        user.recentSends.push(now);
+        // Check if user is spamming
+        // if (spamLimits[socket.id].length > SPAM_THRESHOLD) {
+        //     socket.emit("kicked", "You have been kicked for spamming.");
+        //     setTimeout(() => socket.disconnect(), 150); // disconnect after sending message
+        //     return;
+        // }
+
+        if (user.recentSends.length > SPAM_THRESHOLD) {
+            socket.emit("kicked", "You have been kicked for spamming.");
+            setTimeout(() => socket.disconnect(), 150);
+            return;
+        }
+
+        user.messages.push({
+            id: messageId,
+            createdAt: now,
+        });
+
         // send message to everyone
-        io.emit("chat-message", {
-            username,
-            text: msg,
+        io.emit("new-message", {
+            id: messageId,
+            // user: username,
+            user: user.username,
+            text,
             timestamp: now,
+            replyTo: validatedReplyTo,
+        });
+    });
+
+    socket.on("delete-message", (messageId: unknown) => {
+        if (typeof messageId !== "string") return;
+
+        const user = usersBySocketId[socket.id];
+        if (!user) return;
+
+        const msgIndex = user.messages.findIndex(m => m.id === messageId);
+        if (msgIndex === -1) {
+            // Message does not belong to this user
+            return;
+        }
+
+        // Remove this message from the user's list
+        user.messages.splice(msgIndex, 1);
+
+        io.emit("delete-message-public", messageId);
+    });
+
+    socket.on("edit-message", (msg: unknown) => {
+        if (
+            typeof msg !== "object" ||
+            msg === null ||
+            !("messageId" in msg) ||
+            !("text" in msg)
+        ) return;
+
+        const { messageId, text } = msg as {
+            messageId: string;
+            text: string;
+        };
+
+        if (
+            typeof messageId !== "string" ||
+            typeof text !== "string"
+        ) return;
+
+        const user = usersBySocketId[socket.id];
+        if (!user) return;
+
+        const msgIndex = user.messages.findIndex(m => m.id === messageId);
+        if (msgIndex === -1) {
+            // message does not belong to this user
+            return;
+        }
+
+        // broadcast to all users that a message has been edited
+        io.emit("edit-message", {
+            messageId,
+            text,
         });
     });
 
@@ -122,7 +240,7 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
         console.log("User disconnected:", socket.id);
         activeConnections--;
         const ip = socket._ip;
-        delete spamLimits[socket.id];
+        // delete spamLimits[socket.id];
         delete usersBySocketId[socket.id];
         broadcastActiveConnections();
         broadcastUsers();
@@ -140,7 +258,11 @@ function broadcastActiveConnections(): void {
 }
 
 function broadcastUsers(): void {
-    io.emit("users-update", Object.values(usersBySocketId));
+    // io.emit("users-update", Object.values(usersBySocketId));
+    io.emit(
+        "users-update",
+        Object.values(usersBySocketId).map(user => user.username)
+    );
 }
 
 server.listen(3000, () => {

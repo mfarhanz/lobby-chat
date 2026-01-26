@@ -1,35 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ChatMessage } from "../types/socket";
 import { Thumbnail } from "./Thumbnail";
 import { EmojiIcon } from "./icons/EmojiIcon";
 import { GifIcon } from "./icons/GifIcon";
 import { ImageIcon } from "./icons/ImageIcon";
-
-type ChatProps = {
-    messages: ChatMessage[];
-    connected: boolean;
-    activeConnections: number;
-    startChat: (token?: string) => void;
-    sendMessage: (msg: string) => void;
-};
-
-type MediaValidationResult =
-    | { ok: true }
-    | { ok: false; reason: number };
-
-type FilePreview = {
-    file: File;
-    url: string;
-};
+import { CopyIcon } from "./icons/CopyIcon";
+import { ReplyIcon } from "./icons/ReplyIcon";
+import { TrashIcon } from "./icons/TrashIcon";
+import { ReactionIcon } from "./icons/ReactionIcon";
+import { EditIcon } from "./icons/EditIcon";
+import ChatActionBar from "./ChatActionBar";
+import type { ChatAction, ChatProps, ChatFile, MediaValidationResult, SendPayload } from "../types/chat";
+import { CheckIcon } from "./icons/CheckIcon";
 
 export function Chat({
+    username,
     messages,
     connected,
     activeConnections,
     startChat,
     sendMessage,
+    editMessage,
+    deleteMessage,
 }: ChatProps) {
     const [input, setInput] = useState("");
     const [now, setNow] = useState(new Date());
@@ -38,12 +31,19 @@ export function Chat({
     const [embedError, setEmbedError] = useState<string | null>(null);
     const [showEmbedPopup, setShowEmbedPopup] = useState(false);
 
-    const [upload, setUploads] = useState<FilePreview[]>([]);
-    const uploadsRef = useRef<FilePreview[]>([]);
+    const [upload, setUploads] = useState<ChatFile[]>([]);
+    const uploadsRef = useRef<ChatFile[]>([]);
 
+    const [action, setAction] = useState<ChatAction | null>(null);
+    const [copyId, setCopydId] = useState<string | null>(null);
+    const copyTimeoutRef = useRef<number | null>(null);
+
+    const messagesRef = useRef<HTMLDivElement | null>(null);
+    const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const turnstileRendered = useRef(false);
+    const isAtBottom = useRef(true);
 
     useEffect(() => {
         if (turnstileRendered.current) return;
@@ -66,14 +66,6 @@ export function Chat({
             },
         });
     }, [startChat]);
-
-    // useEffect(() => {
-    //     const timer = setInterval(() => {
-    //         setNow(new Date());
-    //     }, 5 * 60 * 1000); // update every 5mins
-
-    //     return () => clearInterval(timer);
-    // }, []);
 
     useEffect(() => {
         const now = new Date();
@@ -99,6 +91,30 @@ export function Chat({
     }, []);
 
     useEffect(() => {
+        const el = messagesRef.current;
+        if (!el) return;
+
+        const lastMessage = messages[messages.length - 1];
+
+        // 1. If already at bottom -> always scroll
+        // 2. If scrolled up -> scroll only if the last message is from the client
+        if (isAtBottom.current || lastMessage?.user === username) {
+            el.scrollTo({
+                top: el.scrollHeight,
+                behavior: "smooth",
+            });
+        }
+    }, [messages, username]);
+
+    useEffect(() => {
+        return () => {
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
         uploadsRef.current = upload;
     }, [upload]);
 
@@ -111,25 +127,42 @@ export function Chat({
     }, []);
 
     const handleSend = () => {
-        // 1) if popup is still open, block sending
+        // if popup is still open, block sending
         if (showEmbedPopup) {
-            setEmbedError("Please click Attach to validate the media before sending.");
+            setEmbedError("Please click Embed to validate the media before sending.");
             return;
         }
 
-        // 2) if no text and either no embed or embedError exists, block sending
+        // if no text and either no embed or embedError exists, block sending
         if (!input.trim() && (!embed || embedError)) return;
 
-        let finalText = input;
+        let sendText = input;
         if (embed) {
-            finalText += `\n\n![](${embed})`;
+            sendText += `\n\n![](${embed})`;
         }
 
-        sendMessage(finalText);
+        if (action?.type === "edit" && action.messageId) {
+            editMessage(action.messageId, sendText);
+        }
+        else {
+            // if replying to someone, pass in the reply object so ChatMessage can be constructed accordingly later
+            const payload: SendPayload = {
+                text: sendText,
+                ...(action?.type === "reply" && {
+                    replyTo: {
+                        id: action.messageId,
+                        user: action.name,
+                    },
+                }),
+            };
+
+            sendMessage(payload);
+        }
 
         // reset
         setInput("");
         setEmbed(null);
+        setAction(null);
         // reset textarea height
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
@@ -220,6 +253,16 @@ export function Chat({
         return `${fullDate} ${time}`;
     }
 
+    const checkIfAtBottom = (el: HTMLDivElement) => {
+        return el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
+    };
+
+    const handleScroll = () => {
+        const el = messagesRef.current;
+        if (!el) return;
+        isAtBottom.current = checkIfAtBottom(el);
+    };
+
     const validateMediaUrl = (url: string): Promise<MediaValidationResult> => {
         return new Promise((resolve) => {
             const img = new Image();
@@ -239,21 +282,145 @@ export function Chat({
     return (
         <section className="chat-panel">
             {/* Messages */}
-            <div className="chat-messages scrollbar-custom">
-                {messages.map((msg, i) => (
-                    <div key={i} className="chat-message text-message">
+            <div
+                ref={messagesRef}
+                className="chat-messages scrollbar-custom"
+                onScroll={handleScroll}
+            >
+                {messages.map((msg) => (
+                    <div
+                        key={msg.id}
+                        ref={(el) => {
+                            messageRefs.current[msg.id] = el;
+                        }}
+                        className={`chat-message text-message relative 
+                                    ${msg.user === username ? "chat-message-self" : ""}
+                                    ${msg.replyTo?.user === username ? "chat-message-ping" : ""}
+                                    `}
+                    >
+                        {/* Reply indicator */}
+                        {msg.replyTo && (
+                            <div className="reply-wrapper">
+                                <div
+                                    className="reply-indicator cursor-pointer"
+                                    onClick={() => {
+                                        const originalEl = messageRefs.current[msg.replyTo!.id];
+                                        if (originalEl) {
+                                            originalEl.scrollIntoView({ behavior: "smooth", block: "center" });
+                                        }
+                                    }}
+                                >
+                                    {(() => {
+                                        const original = messages.find(m => m.id === msg.replyTo!.id);
+
+                                        if (!original) {
+                                            return <span className="italic ml-1">message deleted</span>;
+                                        }
+
+                                        return (
+                                            <>
+                                                <span className="text-mention-xs">{msg.replyTo.user}</span>
+                                                {original.text.length > 75
+                                                    ? original.text.slice(0, 75) + " ..."
+                                                    : original.text}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Hover actions */}
+                        <div className="chat-message-actions">
+                            <button
+                                className="floating-action-btn"
+                                title="Add reaction"
+                                onClick={() => { }}
+                            >
+                                <ReactionIcon className="size-4" />
+                            </button>
+
+                            {msg.user === username && (
+                                <button
+                                    className="floating-action-btn"
+                                    title="Edit"
+                                    onClick={() => {
+                                        setAction({
+                                            type: "edit",
+                                            messageId: msg.id,
+                                        });
+                                        setInput(msg.text);
+                                        textareaRef.current?.focus();
+                                    }}
+                                >
+                                    <EditIcon className="size-4" />
+                                </button>
+                            )}
+
+                            <button
+                                className="floating-action-btn"
+                                title="Copy"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(msg.text);
+                                    setCopydId(msg.id);
+                                    if (copyTimeoutRef.current) {
+                                        clearTimeout(copyTimeoutRef.current);
+                                    }
+                                    copyTimeoutRef.current = window.setTimeout(() => {
+                                        setCopydId(null);
+                                    }, 2000);
+                                }}
+                            >
+                                {copyId === msg.id ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
+                            </button>
+
+                            {msg.user === username && (
+                                <button
+                                    className="floating-action-btn"
+                                    title="Delete"
+                                    onClick={() => msg.id && deleteMessage(msg.id)}
+                                >
+                                    <TrashIcon className="size-4" />
+                                </button>
+                            )}
+
+                            <button
+                                className="floating-action-btn"
+                                title="Reply"
+                                onClick={() => {
+                                    setAction({
+                                        type: "reply",
+                                        name: msg.user,
+                                        messageId: msg.id,
+                                    });
+                                    textareaRef.current?.focus();
+                                }}
+                            >
+                                <ReplyIcon className="size-4" />
+                            </button>
+                        </div>
+
+                        {/* Message header row */}
                         <div className="chat-message-header">
-                            <span className="chat-message-username">{msg.username}</span>
+                            <span className="chat-message-username">{msg.user}</span>
                             <span className="chat-message-time">
                                 {formatTimestamp(msg.timestamp, now)}
                             </span>
                         </div>
 
-                        <div className="chat-message-text">
-                            <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]}>
-                                {msg.text}
-                            </ReactMarkdown>
+                        {/* Chat message content */}
+                        <div className="chat-message-text-wrapper">
+                            <div className="chat-message-text">
+                                <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]}>
+                                    {msg.text}
+                                </ReactMarkdown>
+                            </div>
+
+                            {msg.edited && (
+                                <span className="chat-message-edited">(edited)</span>
+                            )}
                         </div>
+
                     </div>
                 ))}
             </div>
@@ -284,6 +451,14 @@ export function Chat({
                                 />
                             ))}
                         </div>
+                    )}
+
+                    {action && (
+                        <ChatActionBar
+                            type={action.type}
+                            name={action.type === "reply" ? action.name : undefined}
+                            onClose={() => setAction(null)}
+                        />
                     )}
 
                     <textarea
@@ -346,7 +521,7 @@ export function Chat({
                                         className="text-sm px-3 py-1 rounded-md bg-indigo-600 text-white cursor-pointer"
                                         onClick={handleEmbed}
                                     >
-                                        Attach
+                                        Embed
                                     </button>
                                 </div>
                             </div>
@@ -362,10 +537,10 @@ export function Chat({
                         onChange={handleImageSelect}
                     />
 
-                    <div className="chat-input-icons">
+                    <div className="chat-input-btn-group">
                         <button
                             type="button"
-                            className="chat-input-icon"
+                            className="chat-input-btn"
                             title="Emojis"
                             onClick={() => console.log("emoji")}
                         >
@@ -373,8 +548,8 @@ export function Chat({
                         </button>
                         <button
                             type="button"
-                            className={`chat-input-icon ${embed ? "opacity-50 cursor-not-allowed" : ""}`}
-                            title="Images"
+                            className={`chat-input-btn ${embed ? "opacity-50 cursor-not-allowed" : ""}`}
+                            title="Attach Media"
                             disabled={!!embed}
                             onClick={() => fileInputRef.current?.click()}
                         >
@@ -382,7 +557,7 @@ export function Chat({
                         </button>
                         <button
                             type="button"
-                            className={`chat-input-icon ${embed || upload.length > 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                            className={`chat-input-btn ${embed || upload.length > 0 ? "opacity-50 cursor-not-allowed" : ""}`}
                             title="Embed GIF/Image"
                             disabled={!!embed || upload.length > 0}
                             onClick={() => setShowEmbedPopup(true)}

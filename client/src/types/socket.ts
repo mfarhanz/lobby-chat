@@ -1,16 +1,23 @@
+import type { ChatMessage, SendPayload } from "./chat";
+
 export interface ServerToClientEvents {
-  "chat-message": (msg: ChatMessage) => void;
+  "new-message": (msg: ChatMessage) => void;
+  "delete-message-public": (msgId: string) => void;
+  "edit-message": (payload: {
+    messageId: string;
+    text: string;
+  }) => void;
   "active-connections": (count: number) => void;
-  "users": (users: string[]) => void;
+  "users-update": (users: string[]) => void;
+  "username": (username: string) => void;
   "kicked": (reason?: string) => void;
 }
 
 export interface ClientToServerEvents {
-  "chat-message": (msg: string) => void;
+  "send-message": (msg: SendPayload) => void;
+  "delete-message": (msgId: string) => void;
+  "edit-message": (payload: {
+    messageId: string;
+    text: string;
+  }) => void;
 }
-
-export type ChatMessage = {
-  username: string;
-  text: string;
-  timestamp: number;
-};
