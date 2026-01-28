@@ -7,6 +7,11 @@ export interface ServerToClientEvents {
     messageId: string;
     text: string;
   }) => void;
+  "add-reaction": (payload: {
+    messageId: string;
+    emoji: string;
+    user: string;
+  }) => void;
   "active-connections": (count: number) => void;
   "users-update": (users: string[]) => void;
   "username": (username: string) => void;
@@ -19,5 +24,9 @@ export interface ClientToServerEvents {
   "edit-message": (payload: {
     messageId: string;
     text: string;
+  }) => void;
+  "add-reaction": (payload: {
+    messageId: string;
+    emoji: string;
   }) => void;
 }

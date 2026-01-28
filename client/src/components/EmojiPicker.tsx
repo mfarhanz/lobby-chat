@@ -5,9 +5,12 @@ import data from "@emoji-mart/data/sets/14/twitter.json";
 type Props = {
     onSelect: (emoji: string) => void;
     onClose: () => void;
-};
+    className?: string;
+} & Partial<PickerProps>;
 
-export function EmojiPicker({ onSelect, onClose }: Props) {
+type PickerProps = React.ComponentProps<typeof Picker>;
+
+export function EmojiPicker({ onSelect, onClose, className = "", ...pickerProps }: Props) {
     const wrapperRef = useRef<HTMLDivElement>(null);
 
     // close when clicking outside
@@ -26,18 +29,22 @@ export function EmojiPicker({ onSelect, onClose }: Props) {
     }, [onClose]);
 
     return (
-        <div ref={wrapperRef} className="emoji-picker-wrapper absolute bottom-full mb-2 right-0 w-auto">
+        <div ref={wrapperRef} className={`emoji-picker-wrapper ${className}`}>
             <Picker
                 data={data}
                 onEmojiSelect={(emoji: { native: string; }) => onSelect(emoji.native)}
                 theme="dark"
+                navPosition="top"
                 previewPosition="none"
                 skinTonePosition="none"
                 set="twitter"
                 perLine={9}
-                maxFrequentRows={3}
+                maxFrequentRows={5}
                 emojiSize={30}
                 emojiButtonSize={40}
+                emojiButtonRadius="25%"
+                emojiButtonColors={["rgba(0, 128, 255, 0.3)"]}
+                {...pickerProps}
             />
         </div>
     );

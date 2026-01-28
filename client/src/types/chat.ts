@@ -10,6 +10,7 @@ export type ChatMessage = {
     timestamp: number;
     edited?: boolean;
     replyTo?: ChatReply
+    reactions?: ChatReaction[];
 };
 
 export type ChatProps = {
@@ -21,6 +22,7 @@ export type ChatProps = {
     sendMessage: (msg: SendPayload) => void;
     editMessage: (messageId: string, text: string) => void;
     deleteMessage: (msg: string) => void;
+    addReaction: (messageId: string, emoji: string) => void;
 };
 
 export type ChatFile = {
@@ -36,6 +38,11 @@ export type ChatReply = {
 export type ChatAction =
     | { type: "reply"; name: string; messageId: string }
     | { type: "edit"; messageId: string };
+
+export type ChatReaction = {
+  emoji: string;
+  users: string[];
+};
 
 export type MediaValidationResult =
     | { ok: true }

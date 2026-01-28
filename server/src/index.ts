@@ -202,6 +202,30 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
         io.emit("delete-message-public", messageId);
     });
 
+    socket.on("add-reaction", (msg: unknown) => {
+        if (
+            typeof msg !== "object" ||
+            msg === null ||
+            !("messageId" in msg) ||
+            !("emoji" in msg)
+        ) return;
+        
+        const { messageId, emoji } = msg;
+        if (
+            typeof messageId !== "string" || 
+            typeof emoji !== "string"
+        ) return;
+
+        const user = usersBySocketId[socket.id];
+        if (!user) return;
+
+        io.emit("add-reaction", { 
+            messageId, 
+            emoji, 
+            user: user.username 
+        });
+    });
+
     socket.on("edit-message", (msg: unknown) => {
         if (
             typeof msg !== "object" ||
@@ -210,11 +234,7 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
             !("text" in msg)
         ) return;
 
-        const { messageId, text } = msg as {
-            messageId: string;
-            text: string;
-        };
-
+        const { messageId, text } = msg;
         if (
             typeof messageId !== "string" ||
             typeof text !== "string"

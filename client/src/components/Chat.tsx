@@ -24,6 +24,7 @@ export function Chat({
     sendMessage,
     editMessage,
     deleteMessage,
+    addReaction,
 }: ChatProps) {
     const [input, setInput] = useState("");
     const [now, setNow] = useState(new Date());
@@ -40,6 +41,7 @@ export function Chat({
     const copyTimeoutRef = useRef<number | null>(null);
 
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [emojiPickerOpenId, setEmojiPickerOpenId] = useState<string | null>(null);
 
     const messagesRef = useRef<HTMLDivElement | null>(null);
     const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -99,8 +101,8 @@ export function Chat({
 
         const lastMessage = messages[messages.length - 1];
 
-        // 1. If already at bottom -> always scroll
-        // 2. If scrolled up -> scroll only if the last message is from the client
+        // 1. if already at bottom -> always scroll
+        // 2. if scrolled up -> scroll only if the last message is from the client
         if (isAtBottom.current || lastMessage?.user === username) {
             el.scrollTo({
                 top: el.scrollHeight,
@@ -333,12 +335,25 @@ export function Chat({
                             </div>
                         )}
 
+                        {emojiPickerOpenId === msg.id && (
+                            <EmojiPicker
+                                onSelect={(emoji) => {
+                                    addReaction(msg.id, emoji);
+                                    setEmojiPickerOpenId(null);
+                                }}
+                                onClose={() => setEmojiPickerOpenId(null)}
+                                className="absolute right-0 top-10 z-5"
+                                navPosition="none"
+                                maxFrequentRows={2}
+                            />
+                        )}
+
                         {/* Hover actions */}
                         <div className="chat-message-actions">
                             <button
                                 className="floating-action-btn"
                                 title="Add reaction"
-                                onClick={() => { }}
+                                onClick={() => setEmojiPickerOpenId(msg.id)}
                             >
                                 <ReactionIcon className="size-4" />
                             </button>
@@ -422,6 +437,23 @@ export function Chat({
                             {msg.edited && (
                                 <span className="chat-message-edited">(edited)</span>
                             )}
+                        </div>
+
+                        <div className="message-reactions flex gap-1 mt-1">
+                            {msg.reactions?.map((r) => (
+                                <div
+                                    key={r.emoji}
+                                    className={`reaction-tag 
+                                        ${r.users.includes(username)
+                                            ? "bg-blue-500/25 text-blue-300 "
+                                            : "bg-zinc-700/70"
+                                        }`}
+                                    onClick={() => addReaction(msg.id, r.emoji)}
+                                >
+                                    <span>{r.emoji}</span>
+                                    {r.users.length > 1 && <span className="text-xs">{r.users.length}</span>}
+                                </div>
+                            ))}
                         </div>
 
                     </div>
@@ -538,6 +570,7 @@ export function Chat({
                                 setShowEmojiPicker(false);
                             }}
                             onClose={() => setShowEmojiPicker(false)}
+                            className="absolute bottom-full mb-2 right-0 w-auto"
                         />
                     )}
 

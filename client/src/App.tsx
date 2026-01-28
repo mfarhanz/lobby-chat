@@ -15,6 +15,7 @@ export default function App() {
     sendMessage,
     editMessage,
     deleteMessage,
+    addReaction,
   } = useChat();
 
   return (
@@ -35,6 +36,7 @@ export default function App() {
           sendMessage={sendMessage}
           editMessage={editMessage}
           deleteMessage={deleteMessage}
+          addReaction={addReaction}
         />
 
         <UsersPanel users={users} />

@@ -4,6 +4,7 @@ import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket
 import type { ChatMessage, SendPayload } from "../types/chat";
 
 // const MAX_MESSAGE_LENGTH = 5000;
+const MAX_MESSAGE_REACTIONS = 20;
 
 export function useChat() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -35,6 +36,10 @@ export function useChat() {
     function editMessage(messageId: string, text: string) {
         socket?.emit("edit-message", { messageId, text });
     };
+
+    function addReaction(messageId: string, emoji: string) {
+        socket?.emit("add-reaction", { messageId, emoji });
+    }
 
     useEffect(() => {
         if (!socket) return;
@@ -94,9 +99,58 @@ export function useChat() {
             );
         };
 
+        const handleAddReaction = ({
+            messageId,
+            emoji,
+            user
+        }: {
+            messageId: string;
+            emoji: string;
+            user: string
+
+        }) => {
+            setMessages(prev =>
+                prev.map(m => {
+                    if (m.id !== messageId) return m;
+
+                    const reactions = m.reactions ? [...m.reactions] : [];
+                    const existingIndex = reactions.findIndex(r => r.emoji === emoji);
+
+                    if (existingIndex !== -1) {
+                        const existing = reactions[existingIndex];
+
+                        if (!existing.users.includes(user)) {
+                            reactions[existingIndex] = {
+                                ...existing,
+                                users: [...existing.users, user],
+                            };
+                        } else {
+                            const newUsers = existing.users.filter(u => u !== user);
+
+                            // remove entire reaction if no users left
+                            if (newUsers.length === 0) {
+                                reactions.splice(existingIndex, 1);
+                            } else {
+                                reactions[existingIndex] = {
+                                    ...existing,
+                                    users: newUsers,
+                                };
+                            }
+                        }
+                    } else {
+                        if (reactions.length >= MAX_MESSAGE_REACTIONS) return m;
+                        reactions.push({ emoji, users: [user] });
+                    }
+
+                    return { ...m, reactions };
+                })
+            );
+        };
+
         socket.on("new-message", handleSendMessage);
         socket.on("delete-message-public", handleDeleteMessage);
         socket.on("edit-message", handleEditMessage);
+        socket.on("add-reaction", handleAddReaction);
         socket.on("active-connections", setActiveConnections);
         socket.on("users-update", (usernames) => {
             if (!Array.isArray(usernames)) return;
@@ -142,5 +196,6 @@ export function useChat() {
         sendMessage,
         editMessage,
         deleteMessage,
+        addReaction,
     };
 }
