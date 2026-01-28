@@ -10,6 +10,7 @@ import { ReplyIcon } from "./icons/ReplyIcon";
 import { TrashIcon } from "./icons/TrashIcon";
 import { ReactionIcon } from "./icons/ReactionIcon";
 import { EditIcon } from "./icons/EditIcon";
+import { EmojiPicker } from "./EmojiPicker";
 import ChatActionBar from "./ChatActionBar";
 import type { ChatAction, ChatProps, ChatFile, MediaValidationResult, SendPayload } from "../types/chat";
 import { CheckIcon } from "./icons/CheckIcon";
@@ -37,6 +38,8 @@ export function Chat({
     const [action, setAction] = useState<ChatAction | null>(null);
     const [copyId, setCopydId] = useState<string | null>(null);
     const copyTimeoutRef = useRef<number | null>(null);
+
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     const messagesRef = useRef<HTMLDivElement | null>(null);
     const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -482,7 +485,7 @@ export function Chat({
 
                     {showEmbedPopup && (
                         <div
-                            className="absolute bottom-full mb-2 right-0 w-full max-w-md bg-zinc-800 border border-zinc-700 rounded-lg p-3 shadow-lg z-20"
+                            className="absolute bottom-full mb-2 p-3 right-0 w-full max-w-md bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg "
                             onKeyDown={(e) => {
                                 if (e.key === "Escape") {
                                     setEmbed(null);
@@ -528,6 +531,16 @@ export function Chat({
                         </div>
                     )}
 
+                    {showEmojiPicker && (
+                        <EmojiPicker
+                            onSelect={(emoji) => {
+                                setInput((v) => v + emoji);
+                                setShowEmojiPicker(false);
+                            }}
+                            onClose={() => setShowEmojiPicker(false)}
+                        />
+                    )}
+
                     <input
                         type="file"
                         accept="image/*"
@@ -542,7 +555,7 @@ export function Chat({
                             type="button"
                             className="chat-input-btn"
                             title="Emojis"
-                            onClick={() => console.log("emoji")}
+                            onClick={() => setShowEmojiPicker((v) => !v)}
                         >
                             <EmojiIcon />
                         </button>

@@ -17,7 +17,9 @@ export function Thumbnail({ src, onRemove }: ThumbnailProps) {
       <img
         src={src}
         alt=""
-        className="max-h-25 max-w-25 object-contain rounded-sm bg-zinc-900"
+        loading="lazy"
+        decoding="async"
+        className="w-25 h-25 max-h-25 max-w-25 object-cover rounded-sm bg-zinc-900"
       />
       <button
         onClick={onRemove}
