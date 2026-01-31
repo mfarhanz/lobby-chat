@@ -29,6 +29,7 @@ export default function App() {
       <main className="app-main">
         <Chat
           username={username}
+          users={users}
           messages={messages}
           connected={connected}
           activeConnections={activeConnections}

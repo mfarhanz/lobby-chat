@@ -1,5 +1,6 @@
 export type SendPayload = {
   text: string;
+  images?: MediaMeta[];
   replyTo?: ChatReply;
 };
 
@@ -11,10 +12,12 @@ export type ChatMessage = {
     edited?: boolean;
     replyTo?: ChatReply
     reactions?: ChatReaction[];
+    images?: MediaMeta[];
 };
 
 export type ChatProps = {
     username: string,
+    users: string[],
     messages: ChatMessage[];
     connected: boolean;
     activeConnections: number;
@@ -47,3 +50,12 @@ export type ChatReaction = {
 export type MediaValidationResult =
     | { ok: true }
     | { ok: false; reason: number };
+
+export type MediaMeta = {
+  id: string;
+  key: string;         // object key in bucket
+  url: string;
+  mime: string;
+  size: number;
+};
+

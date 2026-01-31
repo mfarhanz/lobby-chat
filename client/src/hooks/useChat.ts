@@ -3,7 +3,6 @@ import { io, Socket } from "socket.io-client";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
 import type { ChatMessage, SendPayload } from "../types/chat";
 
-// const MAX_MESSAGE_LENGTH = 5000;
 const MAX_MESSAGE_REACTIONS = 20;
 
 export function useChat() {
@@ -25,7 +24,9 @@ export function useChat() {
     }
 
     function sendMessage(payload: SendPayload) {
-        if (!payload.text.trim()) return;
+        const hasText = payload.text.trim().length > 0;
+        const hasImages = !!payload.images?.length;
+        if (!hasText && !hasImages) return;
         socket?.emit("send-message", payload);
     }
 
@@ -45,15 +46,10 @@ export function useChat() {
         if (!socket) return;
 
         const handleSendMessage = (msg: unknown) => {
-            if (
-                !msg ||
-                typeof msg !== "object" ||
-                !("user" in msg) ||
-                !("text" in msg) ||
-                !("timestamp" in msg)
-            ) return;
+            if (!msg || typeof msg !== "object") return;
 
-            const { id, user, text, timestamp, replyTo } = msg as ChatMessage;
+            const { id, user, text, timestamp, images, replyTo } = msg as ChatMessage;
+            console.log(msg);
 
             if (
                 typeof user !== "string" ||
@@ -65,8 +61,6 @@ export function useChat() {
             if (
                 replyTo &&
                 typeof replyTo === "object" &&
-                "id" in replyTo &&
-                "user" in replyTo &&
                 typeof replyTo.id === "string" &&
                 typeof replyTo.user === "string"
             ) {
@@ -76,9 +70,21 @@ export function useChat() {
                 };
             }
 
-            // if (text.length > MAX_MESSAGE_LENGTH) return;
+            let validatedImages: ChatMessage['images'] | undefined;
+            if (Array.isArray(images)) {
+                validatedImages = images.filter(img =>
+                    img &&
+                    typeof img === "object" &&
+                    typeof img.id === "string" &&
+                    typeof img.key === "string" &&
+                    typeof img.url === "string" &&
+                    typeof img.mime === "string" &&
+                    typeof img.size === "number"
+                );
+                if (validatedImages.length === 0) validatedImages = undefined;
+            }
 
-            setMessages((prev) => [...prev, { id, user, text, timestamp, replyTo: validatedReplyTo }]);
+            setMessages((prev) => [...prev, { id, user, text, timestamp, replyTo: validatedReplyTo, images: validatedImages }]);
         };
 
         const handleDeleteMessage = (messageId: string) => {

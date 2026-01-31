@@ -12,11 +12,15 @@ import { ReactionIcon } from "./icons/ReactionIcon";
 import { EditIcon } from "./icons/EditIcon";
 import { EmojiPicker } from "./EmojiPicker";
 import ChatActionBar from "./ChatActionBar";
-import type { ChatAction, ChatProps, ChatFile, MediaValidationResult, SendPayload } from "../types/chat";
+import type { ChatAction, ChatProps, ChatFile, MediaValidationResult, SendPayload, MediaMeta } from "../types/chat";
 import { CheckIcon } from "./icons/CheckIcon";
+
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const PLACEHOLDER_IMG = "https://savethefrogs.com/wp-content/uploads/placeholder-image-blue-landscape.png";
 
 export function Chat({
     username,
+    users,
     messages,
     connected,
     activeConnections,
@@ -33,15 +37,23 @@ export function Chat({
     const [embedError, setEmbedError] = useState<string | null>(null);
     const [showEmbedPopup, setShowEmbedPopup] = useState(false);
 
-    const [upload, setUploads] = useState<ChatFile[]>([]);
+    const [uploads, setUploads] = useState<ChatFile[]>([]);
     const uploadsRef = useRef<ChatFile[]>([]);
 
     const [action, setAction] = useState<ChatAction | null>(null);
     const [copyId, setCopydId] = useState<string | null>(null);
     const copyTimeoutRef = useRef<number | null>(null);
 
+    const [activeImage, setActiveImage] = useState<string | null>(null);
+
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [emojiPickerOpenId, setEmojiPickerOpenId] = useState<string | null>(null);
+
+
+    const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [highlightedIndex, setHighlightedIndex] = useState(0);
+
 
     const messagesRef = useRef<HTMLDivElement | null>(null);
     const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -49,6 +61,26 @@ export function Chat({
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const turnstileRendered = useRef(false);
     const isAtBottom = useRef(true);
+
+    const cleanupPreviewUrls = () => {
+        uploadsRef.current.forEach(({ url }) => {
+            URL.revokeObjectURL(url);
+        });
+    };
+
+    useEffect(() => cleanupPreviewUrls, []);
+
+    useEffect(() => {
+        return () => {
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        uploadsRef.current = uploads;
+    }, [uploads]);
 
     useEffect(() => {
         if (turnstileRendered.current) return;
@@ -111,41 +143,32 @@ export function Chat({
         }
     }, [messages, username]);
 
-    useEffect(() => {
-        return () => {
-            if (copyTimeoutRef.current) {
-                clearTimeout(copyTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    useEffect(() => {
-        uploadsRef.current = upload;
-    }, [upload]);
-
-    useEffect(() => {
-        return () => {
-            uploadsRef.current.forEach(({ url }) =>
-                URL.revokeObjectURL(url)
-            );
-        };
-    }, []);
-
-    const handleSend = () => {
+    const handleSend = async () => {
         // if popup is still open, block sending
         if (showEmbedPopup) {
             setEmbedError("Please click Embed to validate the media before sending.");
             return;
         }
 
+        const hasText = !!input.trim();
+        const hasValidEmbed = !!embed && !embedError;
+        const hasUploads = uploadsRef.current.length > 0;
+
         // if no text and either no embed or embedError exists, block sending
-        if (!input.trim() && (!embed || embedError)) return;
+        if (!hasText && !hasValidEmbed && !hasUploads) return;
 
+        // format text
         let sendText = input;
-        if (embed) {
-            sendText += `\n\n![](${embed})`;
-        }
+        if (embed) sendText += `\n\n![](${embed})`;     // append any image/gif embeds - this will rendered via markdown
+        sendText = sendText.replace(/@(\S+)/g, "[`@$1`](#ping)");    // format pings differently from text
 
+        // send any attached files to temporary online storage
+        const files = uploadsRef.current.map(u => u.file);
+        const images = files.length
+            ? await fakeUploadFiles(files)
+            : undefined;
+
+        // if editing message, don't send anything, just modify the existing chat message
         if (action?.type === "edit" && action.messageId) {
             editMessage(action.messageId, sendText);
         }
@@ -153,6 +176,7 @@ export function Chat({
             // if replying to someone, pass in the reply object so ChatMessage can be constructed accordingly later
             const payload: SendPayload = {
                 text: sendText,
+                images: images,
                 ...(action?.type === "reply" && {
                     replyTo: {
                         id: action.messageId,
@@ -164,10 +188,13 @@ export function Chat({
             sendMessage(payload);
         }
 
+        cleanupPreviewUrls();
+
         // reset
         setInput("");
         setEmbed(null);
         setAction(null);
+        setUploads([]);
         // reset textarea height
         if (textareaRef.current) {
             textareaRef.current.style.height = "auto";
@@ -180,7 +207,7 @@ export function Chat({
             return;
         }
 
-        const result = await validateMediaUrl(embed);
+        const result = await validateMedia(embed);
 
         if (!result.ok) {
             switch (result.reason) {
@@ -201,21 +228,78 @@ export function Chat({
         setEmbedError(null);
     };
 
-    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files ?? []);
         if (!files.length) return;
 
-        const newPreviews = files.map(file => ({
-            file,
-            url: URL.createObjectURL(file),
+        const newPreviews = await Promise.all(files.map(async (file) => {
+            const url = URL.createObjectURL(file);
+            const validation = await validateMedia(url, file);
+            if (!validation.ok) {
+                URL.revokeObjectURL(url);
+                return null; // skip invalid
+            }
+            return { file, url };
         }));
 
         setUploads(prev => {
-            const combined = [...prev, ...newPreviews];
+            const combined = [...prev, ...newPreviews.filter((x): x is ChatFile => x !== null)];
             return combined.slice(0, 4);
         });
 
         e.target.value = "";
+    };
+
+    const handleImageError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+        const el = e.currentTarget;
+        if (el.src !== PLACEHOLDER_IMG) {
+            el.src = PLACEHOLDER_IMG;
+            el.alt = "Could not display image";
+            el.title = "Could not display image";
+        }
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const value = e.target.value;
+        setInput(value);
+        autoResize(e);
+
+        const cursorPos = e.target.selectionStart;
+        const textUpToCursor = value.slice(0, cursorPos);
+
+        const match = textUpToCursor.match(/@(\w*)$/);
+        if (match) {
+            const query = match[1].toLowerCase();
+            const filtered = users.filter(u =>
+                u.toLowerCase().startsWith(query)
+            );
+            setSuggestions(filtered);
+            setShowSuggestions(filtered.length > 0);
+            setHighlightedIndex(0);
+        } else {
+            setShowSuggestions(false);
+            setSuggestions([]);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (showSuggestions && suggestions.length > 0) {
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setHighlightedIndex((i) => (i + 1) % suggestions.length);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setHighlightedIndex((i) =>
+                    i === 0 ? suggestions.length - 1 : i - 1
+                );
+            } else if (e.key === "Enter" || e.key === "Tab") {
+                e.preventDefault();
+                selectSuggestion(suggestions[highlightedIndex]);
+            }
+        } else if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            handleSend();
+        }
     };
 
     function autoResize(e: React.ChangeEvent<HTMLTextAreaElement>) {
@@ -258,6 +342,30 @@ export function Chat({
         return `${fullDate} ${time}`;
     }
 
+    const selectSuggestion = (username: string) => {
+        if (!textareaRef.current) return;
+
+        const textarea = textareaRef.current;
+        const cursorPos = textarea.selectionStart;
+        const textBefore = input.slice(0, cursorPos);
+        const textAfter = input.slice(cursorPos);
+
+        // replace the last @word with the selected username
+        const newTextBefore = textBefore.replace(/@(\w*)$/, `@${username} `);
+
+        const newInput = newTextBefore + textAfter;
+        setInput(newInput);
+
+        // move cursor to right after inserted username
+        const newCursorPos = newTextBefore.length;
+        setTimeout(() => {
+            textarea.setSelectionRange(newCursorPos, newCursorPos);
+        }, 0);
+
+        setShowSuggestions(false);
+        setSuggestions([]);
+    };
+
     const checkIfAtBottom = (el: HTMLDivElement) => {
         return el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
     };
@@ -268,8 +376,15 @@ export function Chat({
         isAtBottom.current = checkIfAtBottom(el);
     };
 
-    const validateMediaUrl = (url: string): Promise<MediaValidationResult> => {
+    const validateMedia = (url: string, file?: File): Promise<MediaValidationResult> => {
         return new Promise((resolve) => {
+            // Size check (for attachments only)
+            if (file && file.size > MAX_FILE_SIZE) {
+                resolve({ ok: false, reason: 3 });
+                console.log("file too big");
+                return;
+            }
+
             const img = new Image();
             img.onload = () => {
                 const oversized = img.naturalWidth > 8000 || img.naturalHeight > 8000;
@@ -284,15 +399,33 @@ export function Chat({
         });
     };
 
+    async function fakeUploadFiles(
+        files: File[],
+    ): Promise<MediaMeta[]> {
+        return files.map(file => {
+            const id = crypto.randomUUID();
+            const key = `chat/${id}-${file.name}`;
+
+            return {
+                id,
+                key,
+                url: `https://fake-cdn.local/${key}`,
+                mime: file.type,
+                size: file.size,
+            };
+        });
+    }
+
     return (
         <section className="chat-panel">
-            {/* Messages */}
+            {/* Messages area */}
             <div
                 ref={messagesRef}
                 className="chat-messages scrollbar-custom"
                 onScroll={handleScroll}
             >
                 {messages.map((msg) => (
+                    // Chat Message
                     <div
                         key={msg.id}
                         ref={(el) => {
@@ -300,7 +433,7 @@ export function Chat({
                         }}
                         className={`chat-message text-message relative 
                                     ${msg.user === username ? "chat-message-self" : ""}
-                                    ${msg.replyTo?.user === username ? "chat-message-ping" : ""}
+                                    ${(msg.replyTo?.user === username || msg.text.includes(`@${username}`)) ? "chat-message-ping" : ""}
                                     `}
                     >
                         {/* Reply indicator */}
@@ -335,6 +468,7 @@ export function Chat({
                             </div>
                         )}
 
+                        {/* Add Reaction's Emoji Picker */}
                         {emojiPickerOpenId === msg.id && (
                             <EmojiPicker
                                 onSelect={(emoji) => {
@@ -429,7 +563,19 @@ export function Chat({
                         {/* Chat message content */}
                         <div className="chat-message-text-wrapper">
                             <div className="chat-message-text">
-                                <ReactMarkdown skipHtml remarkPlugins={[remarkGfm]}>
+                                <ReactMarkdown
+                                    skipHtml
+                                    remarkPlugins={[remarkGfm]}
+                                    components={{
+                                        img: ({ ...props }) => (
+                                            <img
+                                                {...props}
+                                                className="chat-message-image-single cursor-pointer"
+                                                onClick={() => setActiveImage(props.src ?? null)}
+                                            />
+                                        ),
+                                    }}
+                                >
                                     {msg.text}
                                 </ReactMarkdown>
                             </div>
@@ -439,6 +585,35 @@ export function Chat({
                             )}
                         </div>
 
+                        {/* Chat message image attachments */}
+                        {msg.images && (
+                            msg.images.length === 1 ? (
+                                <img
+                                    src={msg.images[0].url}
+                                    alt="uploaded"
+                                    className="chat-message-image-single"
+                                    loading="lazy"
+                                    onClick={() => setActiveImage(msg.images?.[0].url ?? null)}
+                                    onError={handleImageError}
+                                />
+                            ) : (
+                                <div className="chat-message-images-group">
+                                    {msg.images.map((img) => (
+                                        <img
+                                            key={img.id}
+                                            src={img.url}
+                                            alt="uploaded"
+                                            className="chat-message-image-multi"
+                                            loading="lazy"
+                                            onClick={() => setActiveImage(img.url)}
+                                            onError={handleImageError}
+                                        />
+                                    ))}
+                                </div>
+                            )
+                        )}
+
+                        {/* Chat message reaction pills */}
                         <div className="message-reactions flex gap-1 mt-1">
                             {msg.reactions?.map((r) => (
                                 <div
@@ -458,13 +633,30 @@ export function Chat({
 
                     </div>
                 ))}
+
+                {activeImage && (
+                    <div
+                        className="fixed inset-0 z-50 bg-black/80
+                   flex items-center justify-center"
+                        onClick={() => setActiveImage(null)}
+                    >
+                        <img
+                            src={activeImage}
+                            alt="full size"
+                            className="max-w-[90vw] max-h-[90vh] object-contain rounded-md"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                )}
+
             </div>
 
-            {/* Input row */}
+            {/* Chat Input area */}
             <div className="chat-input-row">
                 <div className="chat-input-wrapper">
 
-                    {(embed || upload.length > 0) && (
+                    {/* Media preview row */}
+                    {(embed || uploads.length > 0) && (
                         <div
                             className="absolute bottom-full left-2 -mb-px flex items-baseline gap-2 py-0.5"
                         >
@@ -475,7 +667,7 @@ export function Chat({
                                 />
                             )}
 
-                            {upload.map(({ url }, index) => (
+                            {uploads.map(({ url }, index) => (
                                 <Thumbnail
                                     key={url}
                                     src={url}
@@ -488,6 +680,7 @@ export function Chat({
                         </div>
                     )}
 
+                    {/* Chat Action indicator row */}
                     {action && (
                         <ChatActionBar
                             type={action.type}
@@ -496,6 +689,27 @@ export function Chat({
                         />
                     )}
 
+                    {/* Chat input ping suggestions */}
+                    {showSuggestions && suggestions.length > 0 && (
+                        <ul className="chat-message-mention-list">
+                            {suggestions.map((u, i) => (
+                                <li
+                                    key={u}
+                                    className={`px-4 py-2 text-mention-sm cursor-pointer 
+                                                ${i === highlightedIndex ? "bg-zinc-700/30" : ""} 
+                                                hover:bg-zinc-700/30`}
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        selectSuggestion(u);
+                                    }}
+                                >
+                                    {u}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+
+                    {/* Chat Input */}
                     <textarea
                         ref={textareaRef}
                         className="chat-input"
@@ -503,18 +717,11 @@ export function Chat({
                         disabled={!connected}
                         placeholder="Type a message..."
                         rows={1}
-                        onChange={(e) => {
-                            setInput(e.target.value);
-                            autoResize(e);
-                        }}
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSend();
-                            }
-                        }}
+                        onChange={handleInputChange}
+                        onKeyDown={handleKeyDown}
                     />
 
+                    {/* Media Embed popup */}
                     {showEmbedPopup && (
                         <div
                             className="absolute bottom-full mb-2 p-3 right-0 w-full max-w-md bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg "
@@ -563,6 +770,7 @@ export function Chat({
                         </div>
                     )}
 
+                    {/* Chat input emoji picker */}
                     {showEmojiPicker && (
                         <EmojiPicker
                             onSelect={(emoji) => {
@@ -574,6 +782,7 @@ export function Chat({
                         />
                     )}
 
+                    {/* Media file explorer */}
                     <input
                         type="file"
                         accept="image/*"
@@ -583,6 +792,7 @@ export function Chat({
                         onChange={handleImageSelect}
                     />
 
+                    {/* Chat Input buttons */}
                     <div className="chat-input-btn-group">
                         <button
                             type="button"
@@ -603,9 +813,9 @@ export function Chat({
                         </button>
                         <button
                             type="button"
-                            className={`chat-input-btn ${embed || upload.length > 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                            className={`chat-input-btn ${embed || uploads.length > 0 ? "opacity-50 cursor-not-allowed" : ""}`}
                             title="Embed GIF/Image"
-                            disabled={!!embed || upload.length > 0}
+                            disabled={!!embed || uploads.length > 0}
                             onClick={() => setShowEmbedPopup(true)}
                         >
                             <GifIcon />
@@ -622,7 +832,7 @@ export function Chat({
                 </button>
             </div>
 
-            {/* Status */}
+            {/* Chat live count */}
             <div className="mt-3">
                 <div className="relative inline-block group">
                     <div className="inline-flex items-center px-3 py-1 rounded-md bg-zinc-800/60 border border-zinc-700 text-indigo-500 text-sm font-semibold">

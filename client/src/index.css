@@ -186,6 +186,36 @@ body {
     @apply text-xs text-zinc-500;
   }
 
+  .chat-message-mention-list {
+    @apply absolute bottom-full left-0 overflow-auto;
+    @apply w-full max-h-46 px-4 -mb-1.5;
+    @apply bg-zinc-800 border-zinc-700;
+    @apply border border-b-0 rounded-t-lg;
+
+  }
+
+  .chat-message-mention-list::-webkit-scrollbar { /* hide scrollbar but allow scrolling */
+    display: none;
+  }
+
+  .chat-message-mention-list {  /* hide scrollbar but allow scrolling */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .chat-message-image-single {
+    @apply mt-2 mb-2 rounded-md max-h-[40vh] max-w-[50vw] w-auto h-auto;
+  }
+
+  .chat-message-images-group {
+    @apply mt-2 mb-2 grid gap-2 max-w-[50vw] max-h-[40vh] overflow-clip;
+    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  }
+
+  .chat-message-image-multi {
+    @apply rounded-md w-full aspect-square object-cover cursor-pointer;
+  }
+
   .chat-message-text {
     @apply text-zinc-100 leading-relaxed;
     word-break: break-word;
@@ -198,9 +228,9 @@ body {
     /* preserves newlines and returns in text */
   }
 
-  .chat-message-text img {
+  /* .chat-message-text img {
     @apply mt-2 mb-2 rounded-md max-h-[40vh] max-w-[50vw] w-auto h-auto;
-  }
+  } */
 
   .chat-message-text h1 {
     @apply text-2xl font-bold mt-2 mb-1;
@@ -317,7 +347,7 @@ body {
     @apply w-full h-10 px-4 -mb-1.5;
     @apply text-xs;
     @apply text-zinc-300 bg-zinc-800 border-zinc-700;
-    @apply border border-b-0  rounded-t-lg;
+    @apply border border-b-0 rounded-t-lg;
   }
 
   .reply-wrapper {
@@ -327,7 +357,7 @@ body {
   .reply-indicator {
     @apply inline-flex relative items-baseline self-start whitespace-nowrap;
     @apply mb-1 ml-1 gap-1 max-w-[80%] pl-5 pr-2 py-0.5 text-[11px] rounded-md;
-    @apply text-zinc-300 bg-transparent ;
+    @apply text-zinc-300 bg-transparent;
   }
 
   /* vertical part of connector */

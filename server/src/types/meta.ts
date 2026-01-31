@@ -8,3 +8,11 @@ export type UserMeta = {
   recentSends: number[];
   messages: MessageMeta[];
 };
+
+export type MediaMeta = {
+  id: string;
+  key: string;
+  url: string;
+  mime: string;
+  size: number;
+};
