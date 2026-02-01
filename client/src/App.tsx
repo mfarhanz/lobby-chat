@@ -29,7 +29,7 @@ export default function App() {
       <main className="app-main">
         <Chat
           username={username}
-          users={users}
+          users={users.map(u => u.username)}
           messages={messages}
           connected={connected}
           activeConnections={activeConnections}
@@ -40,7 +40,7 @@ export default function App() {
           addReaction={addReaction}
         />
 
-        <UsersPanel users={users} />
+        <UsersPanel users={users} messages={messages} />
       </main>
     </div>
   );

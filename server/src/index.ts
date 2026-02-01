@@ -3,7 +3,7 @@ import http from "http";
 import { Server, Socket } from "socket.io";
 import dotenv from "dotenv";
 import { generateUsername } from "./username";
-import { UserMeta, MessageMeta, MediaMeta } from "./types/meta";
+import { UserMeta, MediaMeta } from "./types/meta";
 
 dotenv.config();
 
@@ -88,11 +88,14 @@ io.use(async (socket: Socket & { _ip?: string }, next) => {
 io.on("connection", (socket: Socket & { _ip?: string }) => {
     activeConnections++;
     const username = generateUsername();
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(socket.handshake.headers["user-agent"] || "");
 
     usersBySocketId[socket.id] = {
         username,
         recentSends: [],
-        messages: []
+        messages: [],
+        joinedAt: Date.now(),
+        device: isMobile ? "mobile" : "desktop",
     };
 
     socket.emit("username", username);
@@ -103,10 +106,10 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
 
     socket.on("send-message", (msg: unknown) => {
         if (
-            !msg || 
-            typeof msg !== "object" || 
+            !msg ||
+            typeof msg !== "object" ||
             typeof (msg as any).text !== "string"
-        )  return;
+        ) return;
 
         const { text, replyTo } = msg as {
             text: string;
@@ -169,7 +172,7 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
             return;
         }
 
-        user.messages.push({
+        user.messages.push({    // for delete purposes - store in database later
             id: messageId,
             createdAt: now,
         });
@@ -270,7 +273,11 @@ function broadcastActiveConnections(): void {
 function broadcastUsers(): void {
     io.emit(
         "users-update",
-        Object.values(usersBySocketId).map(user => user.username)
+        Object.values(usersBySocketId).map(user => ({
+            username: user.username,
+            joinedAt: user.joinedAt,
+            device: user.device,
+        }))
     );
 }
 

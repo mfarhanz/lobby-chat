@@ -101,15 +101,20 @@ body {
 
   .users-panel {
     @apply w-64 bg-zinc-800/70 rounded-xl p-4 space-y-2;
+    @apply overflow-visible;
   }
 
   .user-item {
-    @apply flex items-center;
+    max-height: 6vh;
+    @apply flex flex-col overflow-hidden;
+    @apply font-mono;
     @apply rounded-md px-3 py-2;
-    @apply text-sm font-medium;
-    @apply bg-zinc-700/70;
-    @apply text-zinc-200;
-    @apply transition-colors;
+    @apply text-zinc-200 bg-zinc-700/70;
+    @apply transition-[max-height] duration-200 ease-out;
+  }
+
+  .user-item.expanded {
+    max-height: 18vh;
   }
 
   .user-item:hover {

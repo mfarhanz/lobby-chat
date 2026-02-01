@@ -7,6 +7,8 @@ export type UserMeta = {
   username: string;
   recentSends: number[];
   messages: MessageMeta[];
+  joinedAt: number;
+  device: string;
 };
 
 export type MediaMeta = {

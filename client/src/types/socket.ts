@@ -1,4 +1,4 @@
-import type { ChatMessage, SendPayload } from "./chat";
+import type { ChatMessage, ChatUser, SendPayload } from "./chat";
 
 export interface ServerToClientEvents {
   "new-message": (msg: ChatMessage) => void;
@@ -13,7 +13,7 @@ export interface ServerToClientEvents {
     user: string;
   }) => void;
   "active-connections": (count: number) => void;
-  "users-update": (users: string[]) => void;
+  "users-update": (users: ChatUser[]) => void;
   "username": (username: string) => void;
   "kicked": (reason?: string) => void;
 }

@@ -28,6 +28,12 @@ export type ChatProps = {
     addReaction: (messageId: string, emoji: string) => void;
 };
 
+
+export type UsersPanelProps = {
+  users: ChatUser[];
+  messages: ChatMessage[];
+};
+
 export type ChatFile = {
     file: File;
     url: string;
@@ -45,6 +51,12 @@ export type ChatAction =
 export type ChatReaction = {
   emoji: string;
   users: string[];
+};
+
+export type ChatUser = {
+  username: string;
+  joinedAt: number;
+  device: string;
 };
 
 export type MediaValidationResult =

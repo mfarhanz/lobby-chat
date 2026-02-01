@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
-import type { ChatMessage, SendPayload } from "../types/chat";
+import type { ChatMessage, ChatUser, SendPayload } from "../types/chat";
 
 const MAX_MESSAGE_REACTIONS = 20;
 
@@ -9,7 +9,7 @@ export function useChat() {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [activeConnections, setActiveConnections] = useState(0);
     const [connected, setConnected] = useState(false);
-    const [users, setUsers] = useState<string[]>([]);
+    const [users, setUsers] = useState<ChatUser[]>([]);
     const [username, setUsername] = useState<string>("");
     const [socket, setSocket] = useState<Socket<
         ServerToClientEvents,
@@ -49,7 +49,6 @@ export function useChat() {
             if (!msg || typeof msg !== "object") return;
 
             const { id, user, text, timestamp, images, replyTo } = msg as ChatMessage;
-            console.log(msg);
 
             if (
                 typeof user !== "string" ||
@@ -153,22 +152,21 @@ export function useChat() {
             );
         };
 
+        socket.on("connect", () => setConnected(true));
+        socket.on("username", setUsername);
         socket.on("new-message", handleSendMessage);
         socket.on("delete-message-public", handleDeleteMessage);
         socket.on("edit-message", handleEditMessage);
         socket.on("add-reaction", handleAddReaction);
         socket.on("active-connections", setActiveConnections);
-        socket.on("users-update", (usernames) => {
-            if (!Array.isArray(usernames)) return;
-            setUsers(usernames);
+        socket.on("users-update", (users) => {
+            if (!Array.isArray(users)) return;
+            setUsers(users);
         });
-        socket.on("username", setUsername);
         socket.on("kicked", (reason) => {
             alert(reason || "You have been kicked!");
             socket.disconnect();
         });
-
-        socket.on("connect", () => setConnected(true));
         socket.on("disconnect", () => {
             setUsers([]);
             setConnected(false);
