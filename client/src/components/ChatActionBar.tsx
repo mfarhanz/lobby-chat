@@ -6,7 +6,7 @@ type Props = {
     onClose: () => void;
 };
 
-export default function ChatActionBar({ type, name, onClose }: Props) {
+export function ChatActionBar({ type, name, onClose }: Props) {
     return (
         <div
             className="chat-action-bar"
