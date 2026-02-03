@@ -1,28 +1,22 @@
 import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { Thumbnail } from "./Thumbnail";
 import { EmojiIcon } from "./icons/EmojiIcon";
 import { GifIcon } from "./icons/GifIcon";
 import { ImageIcon } from "./icons/ImageIcon";
-import { CopyIcon } from "./icons/CopyIcon";
-import { ReplyIcon } from "./icons/ReplyIcon";
-import { TrashIcon } from "./icons/TrashIcon";
-import { ReactionIcon } from "./icons/ReactionIcon";
-import { EditIcon } from "./icons/EditIcon";
 import { EmojiPicker } from "./EmojiPicker";
 import { ChatActionBar } from "./ChatActionBar";
-import { CheckIcon } from "./icons/CheckIcon";
 import { useChatUploads } from "../hooks/useChatUploads";
 import { useChatEmbed } from "../hooks/useChatEmbed";
 import { useChatMentions } from "../hooks/useChatMentions";
 import { useCurrentDay } from "../hooks/useCurrentDay";
 import { useTurnstile } from "../hooks/useTurnstile";
-import { formatTimestamp } from "../utils/dates";
 import { validateMedia } from "../utils/media";
-import type { ChatAction, ChatProps, ChatFile } from "../types/chat";
 import { PLACEHOLDER_IMG } from "../constants/chat";
 import { useChatSend } from "../hooks/useChatSend";
+import { ChatMessage } from "./ChatMessage";
+import { InputModal } from "./InputModal";
+import { IconButton } from "./IconButton";
+import type { MessageActionData, ChatProps, FileData, MessageData } from "../types/chat";
 
 export function Chat({
     username,
@@ -37,7 +31,7 @@ export function Chat({
     addReaction,
 }: ChatProps) {
     const [input, setInput] = useState("");
-    const [action, setAction] = useState<ChatAction | null>(null);
+    const [action, setAction] = useState<MessageActionData | null>(null);
     const [copyId, setCopydId] = useState<string | null>(null);
     const [activeImage, setActiveImage] = useState<string | null>(null);
     const copyTimeoutRef = useRef<number | null>(null);
@@ -153,7 +147,7 @@ export function Chat({
         }));
 
         setUploads(prev => {
-            const combined = [...prev, ...newPreviews.filter((x): x is ChatFile => x !== null)];
+            const combined = [...prev, ...newPreviews.filter((x): x is FileData => x !== null)];
             return combined.slice(0, 4);
         });
 
@@ -179,223 +173,81 @@ export function Chat({
         isAtBottom.current = checkIfAtBottom(el);
     };
 
+    const registerMessageRef = (id: string, el: HTMLDivElement | null) => {
+        if (el) {
+            messageRefs.current[id] = el;
+        }
+    };
+
+    const scrollToMessage = (id: string) => {
+        const el = messageRefs.current[id];
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    };
+
+    const onEditMessage = (m: MessageData) => {
+        setAction({ type: "edit", messageId: m.id });
+        setInput(m.text);
+        textareaRef.current?.focus();
+    };
+
+    const onCopyMessage = (m: MessageData) => {
+        navigator.clipboard.writeText(m.text);
+        setCopydId(m.id);
+        if (copyTimeoutRef.current) {
+            clearTimeout(copyTimeoutRef.current);
+        }
+        copyTimeoutRef.current = window.setTimeout(() => {
+            setCopydId(null);
+        }, 2000);
+    };
+
+    const onReplyMessage = (m: MessageData) => {
+        setAction({
+            type: "reply",
+            name: m.user,
+            messageId: m.id,
+        });
+        textareaRef.current?.focus();
+    };
+
     return (
         <section className="chat-panel">
-            {/* Messages area */}
+            {/* Messages area/window */}
             <div
                 ref={messagesRef}
                 className="chat-messages scrollbar-custom"
                 onScroll={handleScroll}
             >
-                {messages.map((msg) => (
-                    // Chat Message
-                    <div
-                        key={msg.id}
-                        ref={(el) => {
-                            messageRefs.current[msg.id] = el;
-                        }}
-                        className={`chat-message text-message relative 
-                                    ${msg.user === username ? "chat-message-self" : ""}
-                                    ${(msg.replyTo?.user === username || msg.text.includes(`@${username}`)) ? "chat-message-ping" : ""}
-                                    `}
-                    >
-                        {/* Reply indicator */}
-                        {msg.replyTo && (
-                            <div className="reply-wrapper">
-                                <div
-                                    className="reply-indicator cursor-pointer"
-                                    onClick={() => {
-                                        const originalEl = messageRefs.current[msg.replyTo!.id];
-                                        if (originalEl) {
-                                            originalEl.scrollIntoView({ behavior: "smooth", block: "center" });
-                                        }
-                                    }}
-                                >
-                                    {(() => {
-                                        const original = messages.find(m => m.id === msg.replyTo!.id);
+                {messages.map((msg) => {
 
-                                        if (!original) {
-                                            return <span className="italic ml-1">message deleted</span>;
-                                        }
+                    const replyToMessage =
+                        msg.replyTo
+                            ? messages.find(m => m.id === msg.replyTo?.id) ?? null
+                            : null;
 
-                                        return (
-                                            <>
-                                                <span className="text-mention-xs">{msg.replyTo.user}</span>
-                                                {original.text.length > 75
-                                                    ? original.text.slice(0, 75) + " ..."
-                                                    : original.text}
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Add Reaction's Emoji Picker */}
-                        {emojiPickerOpenId === msg.id && (
-                            <EmojiPicker
-                                onSelect={(emoji) => {
-                                    addReaction(msg.id, emoji);
-                                    setEmojiPickerOpenId(null);
-                                }}
-                                onClose={() => setEmojiPickerOpenId(null)}
-                                className="absolute right-0 top-10 z-5"
-                                navPosition="none"
-                                maxFrequentRows={2}
-                            />
-                        )}
-
-                        {/* Hover actions */}
-                        <div className="chat-message-actions">
-                            <button
-                                className="floating-action-btn"
-                                title="Add reaction"
-                                onClick={() => setEmojiPickerOpenId(msg.id)}
-                            >
-                                <ReactionIcon className="size-4" />
-                            </button>
-
-                            {msg.user === username && (
-                                <button
-                                    className="floating-action-btn"
-                                    title="Edit"
-                                    onClick={() => {
-                                        setAction({
-                                            type: "edit",
-                                            messageId: msg.id,
-                                        });
-                                        setInput(msg.text);
-                                        textareaRef.current?.focus();
-                                    }}
-                                >
-                                    <EditIcon className="size-4" />
-                                </button>
-                            )}
-
-                            <button
-                                className="floating-action-btn"
-                                title="Copy"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(msg.text);
-                                    setCopydId(msg.id);
-                                    if (copyTimeoutRef.current) {
-                                        clearTimeout(copyTimeoutRef.current);
-                                    }
-                                    copyTimeoutRef.current = window.setTimeout(() => {
-                                        setCopydId(null);
-                                    }, 2000);
-                                }}
-                            >
-                                {copyId === msg.id ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
-                            </button>
-
-                            {msg.user === username && (
-                                <button
-                                    className="floating-action-btn"
-                                    title="Delete"
-                                    onClick={() => msg.id && deleteMessage(msg.id)}
-                                >
-                                    <TrashIcon className="size-4" />
-                                </button>
-                            )}
-
-                            <button
-                                className="floating-action-btn"
-                                title="Reply"
-                                onClick={() => {
-                                    setAction({
-                                        type: "reply",
-                                        name: msg.user,
-                                        messageId: msg.id,
-                                    });
-                                    textareaRef.current?.focus();
-                                }}
-                            >
-                                <ReplyIcon className="size-4" />
-                            </button>
-                        </div>
-
-                        {/* Message header row */}
-                        <div className="chat-message-header">
-                            <span className="chat-message-username">{msg.user}</span>
-                            <span className="chat-message-time">
-                                {formatTimestamp(msg.timestamp, today)}
-                            </span>
-                        </div>
-
-                        {/* Chat message content */}
-                        <div className="chat-message-text-wrapper">
-                            <div className="chat-message-text">
-                                <ReactMarkdown
-                                    skipHtml
-                                    remarkPlugins={[remarkGfm]}
-                                    components={{
-                                        img: ({ ...props }) => (
-                                            <img
-                                                {...props}
-                                                className="chat-message-image-single cursor-pointer"
-                                                onClick={() => setActiveImage(props.src ?? null)}
-                                            />
-                                        ),
-                                    }}
-                                >
-                                    {msg.text}
-                                </ReactMarkdown>
-                            </div>
-
-                            {msg.edited && (
-                                <span className="chat-message-edited">(edited)</span>
-                            )}
-                        </div>
-
-                        {/* Chat message image attachments */}
-                        {msg.images && (
-                            msg.images.length === 1 ? (
-                                <img
-                                    src={msg.images[0].url}
-                                    alt="uploaded"
-                                    className="chat-message-image-single"
-                                    loading="lazy"
-                                    onClick={() => setActiveImage(msg.images?.[0].url ?? null)}
-                                    onError={handleImageError}
-                                />
-                            ) : (
-                                <div className="chat-message-images-group">
-                                    {msg.images.map((img) => (
-                                        <img
-                                            key={img.id}
-                                            src={img.url}
-                                            alt="uploaded"
-                                            className="chat-message-image-multi"
-                                            loading="lazy"
-                                            onClick={() => setActiveImage(img.url)}
-                                            onError={handleImageError}
-                                        />
-                                    ))}
-                                </div>
-                            )
-                        )}
-
-                        {/* Chat message reaction pills */}
-                        <div className="message-reactions flex gap-1 mt-1">
-                            {msg.reactions?.map((r) => (
-                                <div
-                                    key={r.emoji}
-                                    className={`reaction-tag 
-                                        ${r.users.includes(username)
-                                            ? "bg-blue-500/25 text-blue-300 "
-                                            : "bg-zinc-700/70"
-                                        }`}
-                                    onClick={() => addReaction(msg.id, r.emoji)}
-                                >
-                                    <span>{r.emoji}</span>
-                                    {r.users.length > 1 && <span className="text-xs">{r.users.length}</span>}
-                                </div>
-                            ))}
-                        </div>
-
-                    </div>
-                ))}
+                    return (
+                        <ChatMessage
+                            msg={msg}
+                            username={username}
+                            today={today}
+                            registerRef={registerMessageRef}
+                            onReplyJump={scrollToMessage}
+                            replyingTo={replyToMessage}
+                            isEmojiPickerOpen={emojiPickerOpenId === msg.id}
+                            isCopied={copyId === msg.id}
+                            onCopy={onCopyMessage}
+                            onReply={onReplyMessage}
+                            onEdit={onEditMessage}
+                            onDelete={deleteMessage}
+                            onAddReaction={addReaction}
+                            onImageClick={setActiveImage}
+                            onImageError={handleImageError}
+                            onSetEmojiPickerOpenId={setEmojiPickerOpenId}
+                        />
+                    );
+                })}
 
                 {activeImage && (
                     <div
@@ -420,8 +272,7 @@ export function Chat({
 
                     {/* Media preview row */}
                     {(embed || uploads.length > 0) && (
-                        <div
-                            className="absolute bottom-full left-2 -mb-px flex items-baseline gap-2 py-0.5"
+                        <div className="absolute bottom-full left-2 -mb-px flex items-baseline gap-2 py-0.5"
                         >
                             {embed && !embedError && (
                                 <Thumbnail
@@ -485,53 +336,20 @@ export function Chat({
                     />
 
                     {/* Media Embed popup */}
-                    {showEmbedPopup && (
-                        <div
-                            className="absolute bottom-full mb-2 p-3 right-0 w-full max-w-md bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg "
-                            onKeyDown={(e) => {
-                                if (e.key === "Escape") {
-                                    setEmbed(null);
-                                    setShowEmbedPopup(false);
-                                    setEmbedError(null);
-                                }
-                            }}
-                        >
-                            <div className="space-y-2">
-                                <input
-                                    type="text"
-                                    placeholder="Enter an image or GIF link..."
-                                    className="w-full rounded-md bg-zinc-700 px-3 py-1.5 text-sm outline-none"
-                                    onChange={(e) => setEmbed(e.target.value)}
-                                />
-
-                                {embedError && (
-                                    <div className="text-xs text-red-400">
-                                        {embedError}
-                                    </div>
-                                )}
-
-                                <div className="flex justify-end gap-2 pt-1">
-                                    <button
-                                        className="text-sm text-zinc-400 hover:text-zinc-200 cursor-pointer"
-                                        onClick={() => {
-                                            setEmbed(null);
-                                            setShowEmbedPopup(false);
-                                            setEmbedError(null);
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
-
-                                    <button
-                                        className="text-sm px-3 py-1 rounded-md bg-indigo-600 text-white cursor-pointer"
-                                        onClick={handleEmbed}
-                                    >
-                                        Embed
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <InputModal
+                        value={embed}
+                        action="Embed"
+                        placeholder="Enter an image or GIF link..."
+                        error={embedError}
+                        onChange={setEmbed}
+                        onCancel={() => {
+                            setEmbed(null);
+                            setShowEmbedPopup(false);
+                            setEmbedError(null);
+                        }}
+                        onSubmit={handleEmbed}
+                        isOpen={showEmbedPopup}
+                    />
 
                     {/* Chat input emoji picker */}
                     {showEmojiPicker && (
@@ -557,32 +375,28 @@ export function Chat({
 
                     {/* Chat Input buttons */}
                     <div className="chat-input-btn-group">
-                        <button
-                            type="button"
-                            className="chat-input-btn"
-                            title="Emojis"
-                            onClick={() => setShowEmojiPicker((v) => !v)}
-                        >
-                            <EmojiIcon />
-                        </button>
-                        <button
-                            type="button"
-                            className={`chat-input-btn ${embed ? "opacity-50 cursor-not-allowed" : ""}`}
-                            title="Attach Media"
+                        <IconButton 
+                            icon={<EmojiIcon />}
+                            title="Emojis" 
+                            className="px-2"
+                            onClick={() => setShowEmojiPicker((v) => !v)} 
+                        />
+
+                        <IconButton 
+                            icon={<ImageIcon />} 
+                            title="Attach Media" 
+                            className="px-2"
                             disabled={!!embed}
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            <ImageIcon />
-                        </button>
-                        <button
-                            type="button"
-                            className={`chat-input-btn ${embed || uploads.length > 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                            onClick={() => fileInputRef.current?.click()} 
+                        />
+
+                        <IconButton 
+                            icon={<GifIcon />} 
                             title="Embed GIF/Image"
-                            disabled={!!embed || uploads.length > 0}
-                            onClick={() => setShowEmbedPopup(true)}
-                        >
-                            <GifIcon />
-                        </button>
+                            className="px-2"
+                            disabled={!!embed || uploads.length > 0} 
+                            onClick={() => setShowEmbedPopup(true)} 
+                        />
                     </div>
                 </div>
 

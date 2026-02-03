@@ -1,18 +1,18 @@
 // src/hooks/useChatSend.ts
-import type { ChatAction, ChatFile, SendPayload } from "../types/chat";
+import type { MessageActionData, FileData, SendPayload } from "../types/chat";
 import { fakeUploadFiles } from "../utils/media";
 
 type UseChatSendParams = {
     sendMessage: (payload: SendPayload) => void;
     editMessage: (id: string, text: string) => void;
     cleanupPreviewUrls: () => void;
-    uploadsRef: React.MutableRefObject<ChatFile[]>;
+    uploadsRef: React.MutableRefObject<FileData[]>;
     embed: string | null;        // from useChatEmbed
     embedError: string | null;   // from useChatEmbed
     input: string;
     setInput: (v: string) => void;
-    action: ChatAction | null;
-    setAction: (v: ChatAction | null) => void;
+    action: MessageActionData | null;
+    setAction: (v: MessageActionData | null) => void;
 };
 
 export function useChatSend({

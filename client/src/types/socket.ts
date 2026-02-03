@@ -1,7 +1,7 @@
-import type { ChatMessage, ChatUser, SendPayload } from "./chat";
+import type { MessageData, UserMeta, SendPayload } from "./chat";
 
 export interface ServerToClientEvents {
-  "new-message": (msg: ChatMessage) => void;
+  "new-message": (msg: MessageData) => void;
   "delete-message-public": (msgId: string) => void;
   "edit-message": (payload: {
     messageId: string;
@@ -13,7 +13,7 @@ export interface ServerToClientEvents {
     user: string;
   }) => void;
   "active-connections": (count: number) => void;
-  "users-update": (users: ChatUser[]) => void;
+  "users-update": (users: UserMeta[]) => void;
   "username": (username: string) => void;
   "kicked": (reason?: string) => void;
 }

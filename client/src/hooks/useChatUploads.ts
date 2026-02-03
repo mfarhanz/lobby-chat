@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { ChatFile } from "../types/chat";
+import type { FileData } from "../types/chat";
 
 export function useChatUploads() {
-  const [uploads, setUploads] = useState<ChatFile[]>([]);
-  const uploadsRef = useRef<ChatFile[]>([]);
+  const [uploads, setUploads] = useState<FileData[]>([]);
+  const uploadsRef = useRef<FileData[]>([]);
 
   const cleanupPreviewUrls = () => {
     uploadsRef.current.forEach(({ url }) => {

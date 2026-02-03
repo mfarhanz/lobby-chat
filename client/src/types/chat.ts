@@ -1,24 +1,24 @@
 export type SendPayload = {
   text: string;
   images?: MediaMeta[];
-  replyTo?: ChatReply;
+  replyTo?: ReplyData;
 };
 
-export type ChatMessage = {
+export type MessageData = {
     id: string;
     user: string;
     text: string;
     timestamp: number;
     edited?: boolean;
-    replyTo?: ChatReply
-    reactions?: ChatReaction[];
+    replyTo?: ReplyData
+    reactions?: MessageReactionData[];
     images?: MediaMeta[];
 };
 
 export type ChatProps = {
     username: string,
     users: string[],
-    messages: ChatMessage[];
+    messages: MessageData[];
     connected: boolean;
     activeConnections: number;
     startChat: (token?: string) => void;
@@ -28,32 +28,31 @@ export type ChatProps = {
     addReaction: (messageId: string, emoji: string) => void;
 };
 
-
 export type UsersPanelProps = {
-  users: ChatUser[];
-  messages: ChatMessage[];
+  users: UserMeta[];
+  messages: MessageData[];
 };
 
-export type ChatFile = {
+export type FileData = {
     file: File;
     url: string;
 };
 
-export type ChatReply = {
+export type ReplyData = {
     id: string;
     user: string;
 }
 
-export type ChatAction =
+export type MessageActionData =
     | { type: "reply"; name: string; messageId: string }
     | { type: "edit"; messageId: string };
 
-export type ChatReaction = {
+export type MessageReactionData = {
   emoji: string;
   users: string[];
 };
 
-export type ChatUser = {
+export type UserMeta = {
   username: string;
   joinedAt: number;
   device: string;

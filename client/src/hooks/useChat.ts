@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
-import type { ChatMessage, ChatUser, SendPayload } from "../types/chat";
+import type { MessageData, UserMeta, SendPayload } from "../types/chat";
 
 const MAX_MESSAGE_REACTIONS = 20;
 
 export function useChat() {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [messages, setMessages] = useState<MessageData[]>([]);
     const [activeConnections, setActiveConnections] = useState(0);
     const [connected, setConnected] = useState(false);
-    const [users, setUsers] = useState<ChatUser[]>([]);
+    const [users, setUsers] = useState<UserMeta[]>([]);
     const [username, setUsername] = useState<string>("");
     const [socket, setSocket] = useState<Socket<
         ServerToClientEvents,
@@ -48,7 +48,7 @@ export function useChat() {
         const handleSendMessage = (msg: unknown) => {
             if (!msg || typeof msg !== "object") return;
 
-            const { id, user, text, timestamp, images, replyTo } = msg as ChatMessage;
+            const { id, user, text, timestamp, images, replyTo } = msg as MessageData;
 
             if (
                 typeof user !== "string" ||
@@ -56,7 +56,7 @@ export function useChat() {
                 typeof timestamp !== "number"
             ) return;
 
-            let validatedReplyTo: ChatMessage["replyTo"] | undefined;
+            let validatedReplyTo: MessageData["replyTo"] | undefined;
             if (
                 replyTo &&
                 typeof replyTo === "object" &&
@@ -69,7 +69,7 @@ export function useChat() {
                 };
             }
 
-            let validatedImages: ChatMessage['images'] | undefined;
+            let validatedImages: MessageData['images'] | undefined;
             if (Array.isArray(images)) {
                 validatedImages = images.filter(img =>
                     img &&
