@@ -1,42 +1,46 @@
 import express from "express";
 import http from "http";
-import { Server, Socket } from "socket.io";
 import dotenv from "dotenv";
+import { logger } from "./logger";
+import { Server, Socket } from "socket.io";
 import { generateUsername } from "./username";
 import { UserMeta, MediaMeta } from "./types/meta";
 
 dotenv.config();
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server, {
-    cors: {
-        origin: "http://localhost:5173",
-        methods: ["GET", "POST"],
-    },
-});
-
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET as string;
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN as string;
+const PORT = Number(process.env.PORT) || 3000;
 const MAX_CONNECTIONS = 5;
 const MAX_MESSAGE_LENGTH = 5000;
 const SPAM_THRESHOLD = 5; // max messages
 const SPAM_TIME = 10000; // 10 seconds
 
+const app = express();
+app.set("trust proxy", true);
+const server = http.createServer(app);
+const io = new Server(server, {
+    path: "/socket",
+    cors: {
+        origin: CLIENT_ORIGIN,
+        methods: ["GET", "POST"],
+    },
+});
+
 const connectionsPerIp: Record<string, number> = {};
 const usersBySocketId: Record<string, UserMeta> = {};
+const chat = io.of("/chat");
 let activeConnections = 0;
 
 process.on("uncaughtException", (err: unknown) => {
-    console.error(err);
+    logger.error(`Internal Server Error: ${err}`);
 });
 
 process.on("unhandledRejection", (err: unknown) => {
-    console.error(err);
+    logger.error(`Internal Server Error: ${err}`);
 });
 
-// app.use(express.static("public"));
-
-io.use(async (socket: Socket & { _ip?: string }, next) => {
+chat.use(async (socket: Socket & { _ip?: string }, next) => {
     const ip =
         (socket.handshake.headers["cf-connecting-ip"] as string) ||
         (socket.handshake.headers["x-forwarded-for"] as string | undefined)
@@ -85,7 +89,7 @@ io.use(async (socket: Socket & { _ip?: string }, next) => {
     }
 });
 
-io.on("connection", (socket: Socket & { _ip?: string }) => {
+chat.on("connection", (socket: Socket & { _ip?: string }) => {
     activeConnections++;
     const username = generateUsername();
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(socket.handshake.headers["user-agent"] || "");
@@ -102,7 +106,7 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
     broadcastActiveConnections();
     broadcastUsers();
 
-    console.log("User connected:", socket.id, username);
+    logger.info(`User connected: ${socket.id} (${username})`);
 
     socket.on("send-message", (msg: unknown) => {
         if (
@@ -168,6 +172,7 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
         // Check if user is spamming
         if (user.recentSends.length > SPAM_THRESHOLD) {
             socket.emit("kicked", "You have been kicked for spamming.");
+            logger.info(`User kicked: ${socket.id}`);
             setTimeout(() => socket.disconnect(), 150);
             return;
         }
@@ -178,7 +183,7 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
         });
 
         // send message to everyone
-        io.emit("new-message", {
+        chat.emit("new-message", {
             id: messageId,
             user: user.username,
             text,
@@ -203,7 +208,7 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
         // Remove this message from the user's list
         user.messages.splice(msgIndex, 1);
 
-        io.emit("delete-message-public", messageId);
+        chat.emit("delete-message-public", messageId);
     });
 
     socket.on("add-reaction", (msg: unknown) => {
@@ -218,7 +223,7 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
         const user = usersBySocketId[socket.id];
         if (!user) return;
 
-        io.emit("add-reaction", {
+        chat.emit("add-reaction", {
             messageId,
             emoji,
             user: user.username
@@ -244,14 +249,14 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
         }
 
         // broadcast to all users that a message has been edited
-        io.emit("edit-message", {
+        chat.emit("edit-message", {
             messageId,
             text,
         });
     });
 
     socket.on("disconnect", () => {
-        console.log("User disconnected:", socket.id);
+        logger.info(`User disconnected: ${socket.id}`)
         activeConnections--;
         const ip = socket._ip;
         delete usersBySocketId[socket.id];
@@ -267,11 +272,11 @@ io.on("connection", (socket: Socket & { _ip?: string }) => {
 });
 
 function broadcastActiveConnections(): void {
-    io.emit("active-connections", activeConnections);
+    chat.emit("active-connections", activeConnections);
 }
 
 function broadcastUsers(): void {
-    io.emit(
+    chat.emit(
         "users-update",
         Object.values(usersBySocketId).map(user => ({
             username: user.username,
@@ -281,6 +286,6 @@ function broadcastUsers(): void {
     );
 }
 
-server.listen(3000, () => {
-    console.log("Server running at http://localhost:3000");
+server.listen(PORT, "0.0.0.0", () => {
+    logger.info(`Server listening on port ${PORT}`);
 });

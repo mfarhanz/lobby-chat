@@ -15,24 +15,6 @@ export type MessageData = {
     images?: MediaMeta[];
 };
 
-export type ChatProps = {
-    username: string,
-    users: string[],
-    messages: MessageData[];
-    connected: boolean;
-    activeConnections: number;
-    startChat: (token?: string) => void;
-    sendMessage: (msg: SendPayload) => void;
-    editMessage: (messageId: string, text: string) => void;
-    deleteMessage: (msg: string) => void;
-    addReaction: (messageId: string, emoji: string) => void;
-};
-
-export type UsersPanelProps = {
-  users: UserMeta[];
-  messages: MessageData[];
-};
-
 export type FileData = {
     file: File;
     url: string;
@@ -70,3 +52,17 @@ export type MediaMeta = {
   size: number;
 };
 
+export type DrawerAction = {
+  key: string;
+  label: string;
+  icon?: React.ReactNode;
+  onPress: () => void;
+  destructive?: boolean;
+};
+
+export type DOMEvent = {
+  onClick?: (ev: React.MouseEvent<HTMLDivElement>) => void;
+  onTouchStart?: (ev: React.TouchEvent<HTMLDivElement>) => void;
+  onTouchEnd?: (ev: React.TouchEvent<HTMLDivElement>) => void;
+  onLongPress?: () => void;
+};

@@ -1,11 +1,11 @@
 import { TrashIcon } from "./icons/TrashIcon";
 
-type ThumbnailProps = {
+type Props = {
   src: string;
   onRemove: () => void;
 };
 
-export function Thumbnail({ src, onRemove }: ThumbnailProps) {
+export function Thumbnail({ src, onRemove }: Props) {
   return (
     <div className="relative bottom-full left-3 -mb-px
                     flex items-center gap-2

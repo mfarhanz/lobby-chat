@@ -22,9 +22,9 @@ const map: Record<number, (n?: string, adj?: string, x?: number, adv?: string, v
     8: (n, adj, x) => `${adj}${C(n!)}_${x}`,
     9: (_, adj, x, adv) => `${C(adv!)}${C(adj!)}${x}`,
     10: (n, adj, _, adv) => `${adv}_${adj}_${n}`,
-    11: (n, adj, x, adv) => `${adv}${adj}${n}`,
+    11: (n, adj, _, adv) => `${adv}${adj}${n}`,
     12: (n, _, x, __, ___, n2) => `${n}_of_${n2}${x}`,
-    13: (n, _, x, __, v) => `${C(v!)}The${C(n!)}`,
+    13: (n, _, __, ___, v) => `${C(v!)}The${C(n!)}`,
     14: (n, adj, x) => `The${C(adj!)}${C(n!)}${x}`,
     15: (n, _, x, __, ___, n2) => `${C(n!)}InThe${C(n2!)}${x}`,
     16: (n, _, x, __, v) => `I${C(v!)}${C(n!)}s${x}`,
@@ -33,9 +33,10 @@ const map: Record<number, (n?: string, adj?: string, x?: number, adv?: string, v
 export function generateUsername(): string {
     const adjective = faker.word.adjective();
     const noun = faker.word.noun();
+    const noun2 = faker.word.noun();
     const verb = faker.word.verb();
     const adverb = faker.word.adverb();
     const number = faker.number.int({ min: 1, max: 9999 });
     const format = Math.floor(Math.random() * Object.keys(map).length);
-    return map[format](noun, adjective, number, adverb, verb);
+    return map[format](noun, adjective, number, adverb, verb, noun2);
 }

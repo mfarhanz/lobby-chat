@@ -1,9 +1,9 @@
-type IconButtonProps = {
+type Props = {
   icon: React.ReactNode;
   title?: string;
   disabled?: boolean;
   className?: string;
-  onClick: () => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
 export function IconButton({
@@ -12,7 +12,7 @@ export function IconButton({
   disabled = false,
   className = "",
   onClick,
-}: IconButtonProps) {
+}: Props) {
   return (
     <button
       type="button"

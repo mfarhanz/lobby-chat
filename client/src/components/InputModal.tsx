@@ -1,4 +1,4 @@
-type InputModalProps = {
+type Props = {
     value: string | null;
     action: string;
     placeholder: string;
@@ -18,7 +18,7 @@ export function InputModal({
     onCancel,
     onSubmit,
     isOpen 
-}: InputModalProps) {
+}: Props) {
 
     if (!isOpen) return null;
 

@@ -90,19 +90,27 @@ body {
   }
 
   .app-main {
-    @apply flex flex-1 gap-4 px-6 pb-6;
-    min-height: 0;
+    @apply flex flex-1 gap-4 px-6 pb-6 min-h-0;
   }
 
   .chat-panel {
-    @apply flex flex-col flex-1 bg-zinc-800 rounded-xl p-4;
-    overflow-x: hidden;
+    @apply flex flex-col flex-1 bg-zinc-800 rounded-xl p-4 overflow-x-hidden;
   }
 
   .users-panel {
-    @apply w-64 bg-zinc-800/70 rounded-xl p-4 space-y-2;
-    @apply overflow-visible;
+    @apply w-64 sm:bg-zinc-800/70 bg-zinc-800/95 rounded-xl p-4 space-y-2;
+    @apply transition-transform duration-300 ease-out;
   }
+
+  @media (max-width: 768px) {
+  .users-panel {
+    @apply fixed top-0 right-0 h-full z-40 translate-x-full;
+  }
+
+  .users-panel.mobile-open {
+    @apply translate-x-0;
+  }
+}
 
   .user-item {
     max-height: 6vh;
@@ -122,14 +130,20 @@ body {
   }
 
   .chat-messages {
-    @apply flex-1 overflow-y-auto rounded-lg bg-zinc-800 p-3 space-y-2;
-    overflow-x: hidden;
+    @apply flex-1 overflow-y-auto rounded-lg bg-zinc-800 p-3 space-y-2 overflow-x-hidden;
   }
 
   .chat-message {
     @apply relative rounded-md px-3 py-1.5 leading-relaxed;
     @apply bg-transparent;
   }
+
+  .emoji-picker-anchor {
+  /* position: absolute;
+  right: 0;
+  top: 100%; */
+  z-index: 50;
+}
 
   .chat-message:hover:not(.chat-message-ping) {
     @apply bg-zinc-700/40;

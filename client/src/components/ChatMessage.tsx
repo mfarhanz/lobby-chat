@@ -1,7 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { MessageData } from "../types/chat";
-import { EmojiPicker } from "./EmojiPicker";
+import { lazy, Suspense, useCallback } from "react";
+import type { DOMEvent, MessageData } from "../types/chat";
 import { CheckIcon } from "./icons/CheckIcon";
 import { CopyIcon } from "./icons/CopyIcon";
 import { EditIcon } from "./icons/EditIcon";
@@ -10,8 +10,11 @@ import { ReplyIcon } from "./icons/ReplyIcon";
 import { TrashIcon } from "./icons/TrashIcon";
 import { formatTimestamp } from "../utils/dates";
 import { IconButton } from "./IconButton";
+import { useLongPress } from "../hooks/useLongPress";
+import { TOUCH_DEVICE } from "../utils/device";
+import { Spinner } from "./Spinner";
 
-type ChatMessageProps = {
+type Props = DOMEvent & {
     msg: MessageData;
     username: string;
     today: Date;
@@ -30,6 +33,8 @@ type ChatMessageProps = {
     onSetEmojiPickerOpenId: (id: string | null) => void;
 };
 
+const EmojiPicker = lazy(() => import("./EmojiPicker"));
+
 export function ChatMessage({
     msg,
     username,
@@ -47,7 +52,8 @@ export function ChatMessage({
     onImageClick,
     onImageError,
     onSetEmojiPickerOpenId,
-}: ChatMessageProps) {
+    onLongPress
+}: Props) {
 
     const markdownComponents = {
         img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
@@ -59,15 +65,33 @@ export function ChatMessage({
         ),
     };
 
+    const longPress = useLongPress({
+        delay: 500,
+        callback: () => {
+            if (onLongPress) onLongPress();
+        },
+    });
+
+    const handleEmojiReactionSelect = useCallback(
+        (emoji: string) => {
+            onAddReaction(msg.id, emoji);
+        },
+        [onAddReaction, msg.id]
+    );
+
+    const handleEmojiReactionClose = useCallback(() => {
+        onSetEmojiPickerOpenId(null);
+    }, [onSetEmojiPickerOpenId]);
+
     return (
         // Chat Message
         <div
-            // key={msg.id}
             ref={(el) => registerRef(msg.id, el)}
             className={`chat-message text-message relative 
                         ${msg.user === username ? "chat-message-self" : ""}
                         ${(msg.replyTo?.user === username || msg.text.includes(`@${username}`)) ? "chat-message-ping" : ""}
                         `}
+            {...longPress}
         >
             {/* Reply indicator */}
             {msg.replyTo && (
@@ -91,61 +115,66 @@ export function ChatMessage({
                 </div>
             )}
 
-            {/* Add Reaction's Emoji Picker */}
-            {isEmojiPickerOpen && (
-                <EmojiPicker
-                    onSelect={(emoji) => {
-                        onAddReaction(msg.id, emoji);
-                        onSetEmojiPickerOpenId(null);
-                    }}
-                    onClose={() => onSetEmojiPickerOpenId(null)}
-                    className="absolute right-0 top-10 z-5"
-                    navPosition="none"
-                    maxFrequentRows={2}
-                />
+            {/* Add Reaction's Emoji Picker - only on non-touchscreen */}
+            {!TOUCH_DEVICE && isEmojiPickerOpen && (
+                <Suspense fallback={<Spinner />}>
+                    <EmojiPicker
+                        // onSelect={(emoji) => {
+                        //     onAddReaction(msg.id, emoji);
+                        //     onSetEmojiPickerOpenId(null);
+                        // }}
+                        onSelect={handleEmojiReactionSelect}
+                        // onClose={() => onSetEmojiPickerOpenId(null)}
+                        onClose={handleEmojiReactionClose}
+                        className="absolute right-0 top-10 z-5"
+                        navPosition="none"
+                    />
+                </Suspense>
             )}
 
-            {/* Hover actions */}
-            <div className="chat-message-actions">
-                <IconButton
-                    icon={<ReactionIcon className="size-4" />}
-                    title="Add reaction"
-                    className="text-xs"
-                    onClick={() => onSetEmojiPickerOpenId(msg.id)}
-                />
-
-                {msg.user === username && (
+            {/* Hover actions (only on non-touchscreen) */}
+            {!TOUCH_DEVICE && (
+                <div className="chat-message-actions">
                     <IconButton
-                        icon={<EditIcon className="size-4" />}
-                        title="Edit"
+                        icon={<ReactionIcon className="size-4" />}
+                        title="Add reaction"
                         className="text-xs"
-                        onClick={() => onEdit(msg)}
+                        onClick={() => onSetEmojiPickerOpenId(msg.id)}
                     />
-                )}
 
-                <IconButton
-                    icon={isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
-                    title="Copy"
-                    className="text-xs"
-                    onClick={() => onCopy(msg)}
-                />
+                    {msg.user === username && (
+                        <IconButton
+                            icon={<EditIcon className="size-4" />}
+                            title="Edit"
+                            className="text-xs"
+                            onClick={() => onEdit(msg)}
+                        />
+                    )}
 
-                {msg.user === username && (
                     <IconButton
-                        icon={<TrashIcon className="size-4" />}
-                        title="Delete"
+                        icon={isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
+                        title="Copy"
                         className="text-xs"
-                        onClick={() => onDelete(msg.id)}
+                        onClick={() => onCopy(msg)}
                     />
-                )}
 
-                <IconButton
-                    icon={<ReplyIcon className="size-4" />}
-                    title="Reply"
-                    className="text-xs"
-                    onClick={() => onReply(msg)}
-                />
-            </div>
+                    {msg.user === username && (
+                        <IconButton
+                            icon={<TrashIcon className="size-4" />}
+                            title="Delete"
+                            className="text-xs"
+                            onClick={() => onDelete(msg.id)}
+                        />
+                    )}
+
+                    <IconButton
+                        icon={<ReplyIcon className="size-4" />}
+                        title="Reply"
+                        className="text-xs"
+                        onClick={() => onReply(msg)}
+                    />
+                </div>
+            )}
 
             {/* Message header row */}
             <div className="chat-message-header">

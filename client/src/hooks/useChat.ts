@@ -19,7 +19,14 @@ export function useChat() {
     function startChat(turnstileToken?: string) {
         if (socket) return;
 
-        const newSocket = io({ auth: turnstileToken ? { turnstileToken } : {} });
+        const newSocket = io(
+            import.meta.env.VITE_SOCKET_URL + "/chat",
+            {
+                path: "/socket",
+                auth: turnstileToken ? { turnstileToken } : {},
+            }
+        );
+
         setSocket(newSocket);
     }
 
@@ -39,6 +46,7 @@ export function useChat() {
     };
 
     function addReaction(messageId: string, emoji: string) {
+        console.log(messageId, emoji)
         socket?.emit("add-reaction", { messageId, emoji });
     }
 
@@ -114,6 +122,7 @@ export function useChat() {
             user: string
 
         }) => {
+            console.log(messageId, emoji, user)
             setMessages(prev =>
                 prev.map(m => {
                     if (m.id !== messageId) return m;

@@ -1,12 +1,19 @@
 import { useMemo, useState } from "react";
-import type { UsersPanelProps } from "../types/chat";
 import { MobileIcon } from "./icons/MobileIcon";
 import { ComputerIcon } from "./icons/ComputerIcon";
+import type { MessageData, UserMeta } from "../types/chat";
+
+export type Props = {
+  users: UserMeta[];
+  messages: MessageData[];
+  mobileView: boolean;
+};
 
 export function UsersPanel({
     users,
     messages,
-}: UsersPanelProps) {
+    mobileView,
+}: Props) {
     const [activeUser, setActiveUser] = useState<{ username: string; joinedAt: number; } | null>(null);
     const [now, setNow] = useState<number>(() => Date.now());
 
@@ -44,7 +51,7 @@ export function UsersPanel({
     }
 
     return (
-        <aside className="users-panel">
+        <aside className={`users-panel ${mobileView ? "mobile-open" : ""}`}>
             {users.map((user) => {
                 const stats = userStats[user.username] ?? { count: 0, lastActive: user.joinedAt };
 
