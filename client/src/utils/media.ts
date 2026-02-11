@@ -1,4 +1,4 @@
-import { MAX_FILE_SIZE } from "../constants/chat";
+import { MAX_FILE_SIZE, MAX_PIXEL_COUNT } from "../constants/chat";
 import type { MediaMeta, MediaValidationResult } from "../types/chat";
 
 export const validateMedia = (url: string, file?: File): Promise<MediaValidationResult> => {
@@ -6,13 +6,14 @@ export const validateMedia = (url: string, file?: File): Promise<MediaValidation
         // Size check (for attachments only)
         if (file && file.size > MAX_FILE_SIZE) {
             resolve({ ok: false, reason: 3 });
-            console.log("file too big");
             return;
         }
 
         const img = new Image();
         img.onload = () => {
-            const oversized = img.naturalWidth > 8000 || img.naturalHeight > 8000;
+            const w = img.naturalWidth;
+            const h = img.naturalHeight;
+            const oversized = w > 8000 || h > 8000 || w * h > MAX_PIXEL_COUNT;
             if (oversized) {
                 resolve({ ok: false, reason: 2 });
             } else {

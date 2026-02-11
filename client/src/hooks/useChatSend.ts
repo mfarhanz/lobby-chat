@@ -1,14 +1,12 @@
-// src/hooks/useChatSend.ts
 import type { MessageActionData, FileData, SendPayload } from "../types/chat";
 import { fakeUploadFiles } from "../utils/media";
 
-type UseChatSendParams = {
+interface UseChatSendProps {
     sendMessage: (payload: SendPayload) => void;
     editMessage: (id: string, text: string) => void;
     cleanupPreviewUrls: () => void;
     uploadsRef: React.MutableRefObject<FileData[]>;
-    embed: string | null;        // from useChatEmbed
-    embedError: string | null;   // from useChatEmbed
+    embed: string | null;
     input: string;
     setInput: (v: string) => void;
     action: MessageActionData | null;
@@ -21,19 +19,18 @@ export function useChatSend({
     cleanupPreviewUrls,
     uploadsRef,
     embed,
-    embedError,
     input,
     setInput,
     action,
     setAction,
-}: UseChatSendParams) {
+}: UseChatSendProps) {
 
     const handleSend = async () => {
         const hasText = !!input.trim();
-        const hasValidEmbed = !!embed && !embedError;
+        const hasValidEmbed = !!embed;
         const hasUploads = uploadsRef.current.length > 0;
 
-        // if no text and either no embed or embedError exists, block sending
+        // if no text and either no embed exists, block sending
         if (!hasText && !hasValidEmbed && !hasUploads) return;
 
         // format text

@@ -2,18 +2,23 @@ import { useMemo, useState } from "react";
 import { MobileIcon } from "./icons/MobileIcon";
 import { ComputerIcon } from "./icons/ComputerIcon";
 import type { MessageData, UserMeta } from "../types/chat";
+import NumberFlow from "@number-flow/react";
 
-export type Props = {
-  users: UserMeta[];
-  messages: MessageData[];
-  mobileView: boolean;
+export interface UserProps {
+    username: string;
+    users: UserMeta[];
+    messages: MessageData[];
+    userCount: number;
+    mobileView: boolean;
 };
 
 export function UsersPanel({
+    username,
     users,
     messages,
+    userCount,
     mobileView,
-}: Props) {
+}: UserProps) {
     const [activeUser, setActiveUser] = useState<{ username: string; joinedAt: number; } | null>(null);
     const [now, setNow] = useState<number>(() => Date.now());
 
@@ -52,34 +57,34 @@ export function UsersPanel({
 
     return (
         <aside className={`users-panel ${mobileView ? "mobile-open" : ""}`}>
-            {users.map((user) => {
-                const stats = userStats[user.username] ?? { count: 0, lastActive: user.joinedAt };
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 hide-scrollbar">
+                {users.map((user) => {
+                    const stats = userStats[user.username] ?? { count: 0, lastActive: user.joinedAt };
+                    const expand = activeUser?.username === user.username;
 
-                return (
-                    <div
-                        key={user.username}
-                        className={`
-                            user-item cursor-pointer
-                            transition-all duration-200 ease-out
-                            ${activeUser?.username === user.username ? "expanded bg-zinc-700" : ""}
-                        `}
-                        onClick={() => {
-                            setNow(Date.now());
-                            setActiveUser(
-                                activeUser?.username === user.username ? null : user
-                            );
-                        }}
-                    >
-                        {/* Username list item*/}
+                    return (
                         <div
-                            className={`${activeUser?.username === user.username ? "text-lg" : "text-sm"}`}
+                            key={user.username}
+                            className={`user-item cursor-pointer ${expand ? "expanded bg-zinc-700" : ""}`}
+                            onClick={() => {
+                                setNow(Date.now());
+                                setActiveUser(
+                                    expand ? null : user
+                                );
+                            }}
                         >
-                            {user.username}
-                        </div>
+                            {/* Username list item*/}
+                            <div
+                                className={`overflow-hidden wrap-break-word ${expand ? "text-lg" : "text-sm"} 
+                                            ${user.username === username ? "text-emerald-200" : ""} 
+                                            transition-[font-size] duration-200 ease-out`}
+                            >
+                                {user.username}
+                            </div>
 
-                        {/* Expanded list item */}
-                        {activeUser?.username === user.username && (
-                            <div className="mt-2 text-xs text-zinc-400">
+                            {/* Expanded list item */}
+                            <div className={`leading-tight ${expand ? "mt-2 text-[0.75rem]" : "text-[0rem]"}  
+                                            text-zinc-400 transition-[font-size] duration-300 min-h-0 overflow-hidden`}>
                                 <div>
                                     Joined the chat <span className={`${timeColor(user.joinedAt, now)}`}>
                                         {formatRelativeTime(user.joinedAt, now)}
@@ -93,7 +98,7 @@ export function UsersPanel({
                                 <div>
                                     Messages sent: <span className="text-indigo-400">{stats.count}</span>
                                 </div>
-                                <div className="flex justify-end">
+                                <div className={`flex justify-end ${expand ? "scale-100" : "scale-0"} transition-transform duration-200`}>
                                     {user.device === "mobile" ? (
                                         <MobileIcon className="size-5 text-zinc-300" />
                                     ) : (
@@ -101,10 +106,18 @@ export function UsersPanel({
                                     )}
                                 </div>
                             </div>
-                        )}
-                    </div>
-                );
-            })}
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="mt-auto rounded-full border-t border-zinc-700 text-zinc-400 bg-zinc-800/90 px-3 py-2">
+                <span className="font-mono tracking-wider uppercase">
+                    Users online: <span className="text-indigo-400 font-bold text text-lg">
+                        <NumberFlow value={userCount} />
+                    </span>
+                </span>
+            </div>
         </aside>
     );
 }

@@ -1,16 +1,14 @@
 import { CancelIcon } from "./icons/CancelIcon";
 
-type Props = {
+interface ChatActionBarProps {
     type: "reply" | "edit";
     name?: string;
     onClose: () => void;
 };
 
-export function ChatActionBar({ type, name, onClose }: Props) {
+export function ChatActionBar({ type, name, onClose }: ChatActionBarProps) {
     return (
-        <div
-            className="chat-action-bar"
-        >
+        <div className="chat-action-bar">
             {type === "reply" ? (
                 <span>
                     Replying to

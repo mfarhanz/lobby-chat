@@ -1,17 +1,20 @@
 import { useRef, useEffect, useCallback, memo } from "react";
 import Picker from "@emoji-mart/react";
 import data from "@emoji-mart/data/sets/14/twitter.json";
-
-type Props = {
-    onSelect: (emoji: string) => void;
-    onClose: () => void;
-    className?: string;
-} & Partial<PickerProps>;
+import { useWindowWidth } from "../hooks/useWindowWidth";
 
 type PickerProps = React.ComponentProps<typeof Picker>;
 
-export default memo(function EmojiPicker({ onSelect, onClose, className = "", ...pickerProps }: Props) {
+interface EmojiPickerProps extends Partial<PickerProps> {
+  onSelect: (emoji: string) => void;
+  onClose: () => void;
+  className?: string;
+}
+
+export default memo(function EmojiPicker({ onSelect, onClose, className = "", ...pickerProps }: EmojiPickerProps) {
     const wrapperRef = useRef<HTMLDivElement>(null);
+
+    const width = useWindowWidth();
 
     const handleClickOutside = useCallback((e: MouseEvent) => {
         if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
@@ -25,6 +28,12 @@ export default memo(function EmojiPicker({ onSelect, onClose, className = "", ..
         },
         [onSelect]
     );
+
+    const perLine = width >= 480 ? 10 : 
+                    width >= 440 ? 9 : 
+                    width >= 400 ? 8 :
+                    width >= 350 ? 7 :
+                    6;
 
     // close when clicking outside
     useEffect(() => {
@@ -42,7 +51,7 @@ export default memo(function EmojiPicker({ onSelect, onClose, className = "", ..
                 previewPosition="none"
                 skinTonePosition="none"
                 set="twitter"
-                perLine={9}
+                perLine={perLine}
                 maxFrequentRows={2}
                 emojiSize={30}
                 emojiButtonSize={40}

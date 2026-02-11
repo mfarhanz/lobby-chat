@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
 import type { MessageData, UserMeta, SendPayload } from "../types/chat";
-
-const MAX_MESSAGE_REACTIONS = 20;
+import { MAX_MESSAGE_REACTIONS } from "../constants/chat";
 
 export function useChat() {
     const [messages, setMessages] = useState<MessageData[]>([]);
-    const [activeConnections, setActiveConnections] = useState(0);
+    const [userCount, setUserCount] = useState(0);
     const [connected, setConnected] = useState(false);
     const [users, setUsers] = useState<UserMeta[]>([]);
     const [username, setUsername] = useState<string>("");
@@ -46,7 +45,6 @@ export function useChat() {
     };
 
     function addReaction(messageId: string, emoji: string) {
-        console.log(messageId, emoji)
         socket?.emit("add-reaction", { messageId, emoji });
     }
 
@@ -122,7 +120,6 @@ export function useChat() {
             user: string
 
         }) => {
-            console.log(messageId, emoji, user)
             setMessages(prev =>
                 prev.map(m => {
                     if (m.id !== messageId) return m;
@@ -167,7 +164,7 @@ export function useChat() {
         socket.on("delete-message-public", handleDeleteMessage);
         socket.on("edit-message", handleEditMessage);
         socket.on("add-reaction", handleAddReaction);
-        socket.on("active-connections", setActiveConnections);
+        socket.on("active-connections", setUserCount);
         socket.on("users-update", (users) => {
             if (!Array.isArray(users)) return;
             setUsers(users);
@@ -184,7 +181,7 @@ export function useChat() {
         return () => {
             socket.off("new-message", handleSendMessage);
             socket.off("delete-message-public", handleDeleteMessage);
-            socket.off("active-connections", setActiveConnections);
+            socket.off("active-connections", setUserCount);
             socket.off("users-update");
             socket.off("username");
             socket.off("kicked");
@@ -201,7 +198,7 @@ export function useChat() {
 
     return {
         connected,
-        activeConnections,
+        userCount,
         messages,
         users,
         username,

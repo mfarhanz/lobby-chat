@@ -1,7 +1,7 @@
 import { useRef, useCallback } from "react";
 import { TOUCH_DEVICE } from "../utils/device";
 
-type UseLongPressOptions = {
+interface UseLongPressProps {
     delay?: number;
     callback: () => void;
 };
@@ -9,7 +9,7 @@ type UseLongPressOptions = {
 export function useLongPress({
     delay = 500,
     callback,
-}: UseLongPressOptions) {
+}: UseLongPressProps) {
     const timerRef = useRef<number | null>(null);
 
     const start = useCallback(() => {

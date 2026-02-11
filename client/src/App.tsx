@@ -1,14 +1,14 @@
-import { Chat } from "./components/Chat";
-import { UsersPanel } from "./components/UsersPanel";
-import { TurnstileOverlay } from "./components/TurnstileOverlay";
-import { useChat } from "./hooks/useChat";
 import "./App.css";
 import { useEffect, useState } from "react";
+import { Chat } from "./components/Chat";
+import { UsersPanel } from "./components/UsersPanel";
+// import { TurnstileOverlay } from "./components/TurnstileOverlay";
+import { useChat } from "./hooks/useChat";
 
 export default function App() {
     const {
         connected,
-        activeConnections,
+        userCount,
         messages,
         users,
         username,
@@ -40,7 +40,7 @@ export default function App() {
 
     return (
         <div className="app-shell">
-            <TurnstileOverlay />
+            {/* <TurnstileOverlay /> */}
 
             <header
                 className="app-header text-title"
@@ -55,7 +55,6 @@ export default function App() {
                     users={users.map(u => u.username)}
                     messages={messages}
                     connected={connected}
-                    activeConnections={activeConnections}
                     startChat={startChat}
                     sendMessage={sendMessage}
                     editMessage={editMessage}
@@ -71,8 +70,10 @@ export default function App() {
                 )}
 
                 <UsersPanel
+                    username={username}
                     users={users}
                     messages={messages}
+                    userCount={userCount}
                     mobileView={usersOpen}
                 />
             </main>

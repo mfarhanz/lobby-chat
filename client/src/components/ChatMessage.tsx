@@ -14,7 +14,7 @@ import { useLongPress } from "../hooks/useLongPress";
 import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
 
-type Props = DOMEvent & {
+interface ChatMessageProps extends DOMEvent {
     msg: MessageData;
     username: string;
     today: Date;
@@ -53,7 +53,7 @@ export function ChatMessage({
     onImageError,
     onSetEmojiPickerOpenId,
     onLongPress
-}: Props) {
+}: ChatMessageProps) {
 
     const markdownComponents = {
         img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (

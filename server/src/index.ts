@@ -11,9 +11,9 @@ dotenv.config();
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET as string;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN as string;
 const PORT = Number(process.env.PORT) || 3000;
-const MAX_CONNECTIONS = 5;
+const MAX_CONNECTIONS = 15;
 const MAX_MESSAGE_LENGTH = 5000;
-const SPAM_THRESHOLD = 5; // max messages
+const SPAM_THRESHOLD = 15; // max messages
 const SPAM_TIME = 10000; // 10 seconds
 
 const app = express();
@@ -48,45 +48,45 @@ chat.use(async (socket: Socket & { _ip?: string }, next) => {
         socket.handshake.address;
     socket._ip = ip;
 
-    // connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;     // temporary
-    // if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
-    //     connectionsPerIp[ip]--;
-    //     return next(new Error("Too many connections from this IP"));
+    connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;     // temporary( no turnstile)
+    if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
+        connectionsPerIp[ip]--;
+        return next(new Error("Too many connections from this IP"));
+    }
+    return next();
+
+    // const token = socket.handshake.auth?.turnstileToken as string | undefined;
+    // if (!token) {
+    //     return next(new Error("No Turnstile token provided"));
     // }
-    // return next();
 
-    const token = socket.handshake.auth?.turnstileToken as string | undefined;
-    if (!token) {
-        return next(new Error("No Turnstile token provided"));
-    }
+    // try {
+    //     let params = new URLSearchParams();
+    //     params.append('secret', TURNSTILE_SECRET);
+    //     params.append('response', token);
 
-    try {
-        let params = new URLSearchParams();
-        params.append('secret', TURNSTILE_SECRET);
-        params.append('response', token);
+    //     const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    //         body: params,
+    //         method: "POST",
+    //     });
 
-        const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-            body: params,
-            method: "POST",
-        });
+    //     const data: { success?: boolean } = await res.json();
 
-        const data: { success?: boolean } = await res.json();
+    //     if (!data.success) {
+    //         return next(new Error("Turnstile validation failed"));
+    //     }
 
-        if (!data.success) {
-            return next(new Error("Turnstile validation failed"));
-        }
+    //     // Increment ONLY after validation passes
+    //     connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;
+    //     if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
+    //         connectionsPerIp[ip]--;
+    //         return next(new Error("Too many connections from this IP"));
+    //     }
 
-        // Increment ONLY after validation passes
-        connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;
-        if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
-            connectionsPerIp[ip]--;
-            return next(new Error("Too many connections from this IP"));
-        }
-
-        next();
-    } catch (err) {
-        return next(new Error("Turnstile validation error"));
-    }
+    //     next();
+    // } catch (err) {
+    //     return next(new Error("Turnstile validation error"));
+    // }
 });
 
 chat.on("connection", (socket: Socket & { _ip?: string }) => {

@@ -81,6 +81,17 @@ body {
     background: transparent;
   }
 
+    .hide-scrollbar::-webkit-scrollbar {
+    /* hide scrollbar but allow scrolling */
+    display: none;
+  }
+
+  .hide-scrollbar {
+    /* hide scrollbar but allow scrolling */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
   .app-shell {
     @apply min-h-screen flex flex-col h-screen;
   }
@@ -98,31 +109,31 @@ body {
   }
 
   .users-panel {
-    @apply w-64 sm:bg-zinc-800/70 bg-zinc-800/95 rounded-xl p-4 space-y-2;
+    @apply flex flex-col w-64 sm:bg-zinc-800/70 bg-zinc-800/95 rounded-xl p-4 space-y-2;
     @apply transition-transform duration-300 ease-out;
   }
 
   @media (max-width: 768px) {
-  .users-panel {
-    @apply fixed top-0 right-0 h-full z-40 translate-x-full;
-  }
+    .users-panel {
+      @apply fixed top-0 right-0 h-full z-40 translate-x-full;
+    }
 
-  .users-panel.mobile-open {
-    @apply translate-x-0;
+    .users-panel.mobile-open {
+      @apply translate-x-0;
+    }
   }
-}
 
   .user-item {
-    max-height: 6vh;
-    @apply flex flex-col overflow-hidden;
-    @apply font-mono;
-    @apply rounded-md px-3 py-2;
-    @apply text-zinc-200 bg-zinc-700/70;
-    @apply transition-[max-height] duration-200 ease-out;
+    @apply grid font-mono rounded-md px-3 py-2 text-zinc-200 bg-zinc-700/70 overflow-hidden;
+
+    grid-template-rows: auto 0fr;
+    transition: grid-template-rows 300ms ease-out;
+    will-change: grid-template-rows;
+    contain: layout paint;
   }
 
   .user-item.expanded {
-    max-height: 18vh;
+    grid-template-rows: auto 1fr;
   }
 
   .user-item:hover {
@@ -137,13 +148,6 @@ body {
     @apply relative rounded-md px-3 py-1.5 leading-relaxed;
     @apply bg-transparent;
   }
-
-  .emoji-picker-anchor {
-  /* position: absolute;
-  right: 0;
-  top: 100%; */
-  z-index: 50;
-}
 
   .chat-message:hover:not(.chat-message-ping) {
     @apply bg-zinc-700/40;
@@ -202,15 +206,6 @@ body {
     @apply bg-zinc-800 border-zinc-700;
     @apply border border-b-0 rounded-t-lg;
 
-  }
-
-  .chat-message-mention-list::-webkit-scrollbar { /* hide scrollbar but allow scrolling */
-    display: none;
-  }
-
-  .chat-message-mention-list {  /* hide scrollbar but allow scrolling */
-    -ms-overflow-style: none;
-    scrollbar-width: none;
   }
 
   .chat-message-image-single {
@@ -300,13 +295,13 @@ body {
   }
 
   .chat-input {
-    @apply flex-1 w-full rounded-lg bg-zinc-700/70 px-4 py-2 pr-28 max-h-70 z-5 resize-none overflow-y-auto;
+    @apply flex-1 w-full rounded-lg bg-zinc-700/70 px-4 py-2 pr-21 max-h-70 z-5 resize-none overflow-y-auto;
     @apply placeholder-zinc-400 outline-none;
     @apply focus:ring-1 focus:ring-violet-500;
   }
 
   .chat-input-row {
-    @apply mt-1 flex items-center gap-2;
+    @apply mt-1 flex items-end gap-2;
   }
 
   .chat-input-wrapper {

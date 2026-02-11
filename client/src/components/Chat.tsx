@@ -1,36 +1,33 @@
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import { Thumbnail } from "./Thumbnail";
 import { EmojiIcon } from "./icons/EmojiIcon";
-import { GifIcon } from "./icons/GifIcon";
 import { ImageIcon } from "./icons/ImageIcon";
 import { ChatActionBar } from "./ChatActionBar";
-import { useChatUploads } from "../hooks/useChatUploads";
-import { useChatEmbed } from "../hooks/useChatEmbed";
-import { useChatMentions } from "../hooks/useChatMentions";
+import { useChatUpload } from "../hooks/useChatUpload";
+import { useChatMention } from "../hooks/useChatMention";
 import { useCurrentDay } from "../hooks/useCurrentDay";
 import { useTurnstile } from "../hooks/useTurnstile";
 import { validateMedia } from "../utils/media";
 import { PLACEHOLDER_IMG } from "../constants/chat";
 import { useChatSend } from "../hooks/useChatSend";
 import { ChatMessage } from "./ChatMessage";
-import { InputModal } from "./InputModal";
 import { IconButton } from "./IconButton";
 import { EditIcon } from "./icons/EditIcon";
 import { TrashIcon } from "./icons/TrashIcon";
 import { CopyIcon } from "./icons/CopyIcon";
 import { ReplyIcon } from "./icons/ReplyIcon";
 import { ReactionIcon } from "./icons/ReactionIcon";
-import { ButtonDrawer } from "./ButtonDrawer";
+import { Drawer } from "./Drawer";
 import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
+import { usePaste } from "../hooks/usePaste";
 import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction } from "../types/chat";
 
-export type Props = {
+export interface ChatProps {
     username: string,
     users: string[],
     messages: MessageData[];
     connected: boolean;
-    activeConnections: number;
     startChat: (token?: string) => void;
     sendMessage: (msg: SendPayload) => void;
     editMessage: (messageId: string, text: string) => void;
@@ -46,14 +43,14 @@ export function Chat({
     users,
     messages,
     connected,
-    activeConnections,
     startChat,
     sendMessage,
     editMessage,
     deleteMessage,
     addReaction,
-}: Props) {
+}: ChatProps) {
     const [input, setInput] = useState("");
+    const [embed, setEmbed] = useState<string | null>(null);
     const [action, setAction] = useState<MessageActionData | null>(null);
     const [copyId, setCopydId] = useState<string | null>(null);
     const [activeImage, setActiveImage] = useState<string | null>(null);
@@ -71,21 +68,11 @@ export function Chat({
     const isAtBottom = useRef(true);
 
     const {
-        embed,
-        setEmbed,
-        embedError,
-        setEmbedError,
-        showEmbedPopup,
-        setShowEmbedPopup,
-        handleEmbed,
-    } = useChatEmbed();
-
-    const {
         uploads,
         setUploads,
         uploadsRef,
         cleanupPreviewUrls,
-    } = useChatUploads();
+    } = useChatUpload();
 
     const {
         suggestions,
@@ -94,7 +81,7 @@ export function Chat({
         selectSuggestion,
         handleInputChange,
         handleKeyDown,
-    } = useChatMentions({ users, input, setInput, textareaRef });
+    } = useChatMention({ users, input, setInput, textareaRef });
 
     const {
         handleSend
@@ -104,7 +91,6 @@ export function Chat({
         cleanupPreviewUrls,
         uploadsRef,
         embed,
-        embedError,
         input,
         setInput,
         action,
@@ -184,8 +170,8 @@ export function Chat({
 
         const lastMessage = messages[messages.length - 1];
 
-        // 1. if already at bottom -> always scroll
-        // 2. if scrolled up -> scroll only if the last message is from the client
+        // 1. if already at bottom, always scroll
+        // 2. if scrolled up, scroll only if the last message is from the client
         if (isAtBottom.current || lastMessage?.user === username) {
             el.scrollTo({
                 top: el.scrollHeight,
@@ -194,15 +180,14 @@ export function Chat({
         }
     }, [messages, username]);
 
+    useEffect(() => {
+        return () => {
+            if (embed) URL.revokeObjectURL(embed);
+        };
+    }, [embed]);
+
     const onSend = async () => {
         if (!textareaRef.current) return;
-
-        // if popup is still open, block sending
-        if (showEmbedPopup) {
-            setEmbedError("Please click Embed to validate the media before sending.");
-            return;
-        }
-
         await handleSend();
 
         // reset local states
@@ -222,14 +207,18 @@ export function Chat({
         isAtBottom.current = checkIfAtBottom(el);
     };
 
+    const { handlePaste } = usePaste({
+        callback: (src: string) => setEmbed(src)
+    });
+
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files ?? []);
         if (!files.length) return;
 
         const newPreviews = await Promise.all(files.map(async (file) => {
             const url = URL.createObjectURL(file);
-            const validation = await validateMedia(url, file);
-            if (!validation.ok) {
+            const result = await validateMedia(url, file);
+            if (!result.ok) {
                 URL.revokeObjectURL(url);
                 return null; // skip invalid
             }
@@ -354,7 +343,7 @@ export function Chat({
                 })}
 
                 {/* Message Actions - for touchscreen only */}
-                <ButtonDrawer
+                <Drawer
                     open={!!drawerMessage}
                     actions={drawerActions}
                     onClose={() => setDrawerMessage(null)}
@@ -386,7 +375,7 @@ export function Chat({
                     {(embed || uploads.length > 0) && (
                         <div className="absolute bottom-full left-2 -mb-px flex items-baseline gap-2 py-0.5"
                         >
-                            {embed && !embedError && (
+                            {embed && (
                                 <Thumbnail
                                     src={embed}
                                     onRemove={() => setEmbed(null)}
@@ -417,7 +406,7 @@ export function Chat({
 
                     {/* Chat input ping suggestions */}
                     {showSuggestions && suggestions.length > 0 && (
-                        <ul className="chat-message-mention-list">
+                        <ul className="chat-message-mention-list hide-scrollbar">
                             {suggestions.map((u, i) => (
                                 <li
                                     key={u}
@@ -445,22 +434,7 @@ export function Chat({
                         rows={1}
                         onChange={handleInputChange}
                         onKeyDown={(e) => handleKeyDown(e, onSend)}
-                    />
-
-                    {/* Media Embed popup */}
-                    <InputModal
-                        value={embed}
-                        action="Embed"
-                        placeholder="Enter an image or GIF link..."
-                        error={embedError}
-                        onChange={setEmbed}
-                        onCancel={() => {
-                            setEmbed(null);
-                            setShowEmbedPopup(false);
-                            setEmbedError(null);
-                        }}
-                        onSubmit={handleEmbed}
-                        isOpen={showEmbedPopup}
+                        onPaste={handlePaste}
                     />
 
                     {/* Chat input emoji picker */}
@@ -469,11 +443,7 @@ export function Chat({
                             <>
                                 <div className="absolute bottom-full mb-2 right-0 w-auto">
                                     <EmojiPicker
-                                        // onSelect={(emoji) => {
-                                        //     setInput((v) => v + emoji);
-                                        // }}
                                         onSelect={handleEmojiInputSelect}
-                                        // onClose={() => setShowEmojiPicker(false)}
                                         onClose={handleEmojiInputClose}
                                     />
                                 </div>
@@ -507,14 +477,6 @@ export function Chat({
                             disabled={!!embed}
                             onClick={() => fileInputRef.current?.click()}
                         />
-
-                        <IconButton
-                            icon={<GifIcon />}
-                            title="Embed GIF/Image"
-                            className="px-2"
-                            disabled={!!embed || uploads.length > 0}
-                            onClick={() => setShowEmbedPopup(true)}
-                        />
                     </div>
                 </div>
 
@@ -533,11 +495,7 @@ export function Chat({
                     <div className="flex justify-center mt-2 mb-2 animate-slide-up">
                         <div className="w-screen rounded-t-2xl bg-zinc-900">
                             <EmojiPicker
-                                // onSelect={(emoji) => {
-                                //     setInput((v) => v + emoji);
-                                // }}
                                 onSelect={handleEmojiInputSelect}
-                                // onClose={() => setShowEmojiPicker(false)}
                                 onClose={handleEmojiInputClose}
                                 navPosition="none"
                             />
@@ -545,20 +503,6 @@ export function Chat({
                     </div>
                 </Suspense>
             )}
-
-            {/* Chat live count */}
-            <div className="mt-3">
-                <div className="relative inline-block group">
-                    <div className="inline-flex items-center px-3 py-1 rounded-md bg-zinc-800/60 border border-zinc-700 text-indigo-500 text-sm font-semibold">
-                        {activeConnections}
-                    </div>
-                    <div className="status-tooltip">
-                        {activeConnections === 1
-                            ? `There is currently ${activeConnections} person here`
-                            : `There are currently ${activeConnections} people here`}
-                    </div>
-                </div>
-            </div>
 
             {/* Drawer Emoji Picker - for reactions on touchscreen only*/}
             {TOUCH_DEVICE && emojiPickerOpenId && (
@@ -573,12 +517,7 @@ export function Chat({
                         {/* Drawer */}
                         <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-zinc-900 p-4 animate-slide-up">
                             <EmojiPicker
-                                // onSelect={(emoji) => {
-                                //     addReaction(emojiPickerOpenId, emoji);
-                                //     setEmojiPickerOpenId(null);
-                                // }}
                                 onSelect={handleEmojiReactionSelect}
-                                // onClose={() => setEmojiPickerOpenId(null)}
                                 onClose={handleEmojiReactionClose}
                                 className="w-full"
                                 navPosition="none"

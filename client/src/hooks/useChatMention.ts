@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { autoResize } from "../utils/textarea";
 
-interface Props {
+interface UseChatMentionProps {
     users: string[];
     input: string;
     setInput: (value: string) => void;
     textareaRef: React.RefObject<HTMLTextAreaElement>;
 }
 
-export function useChatMentions({ users, input, setInput, textareaRef }: Props) {
+export function useChatMention({ users, input, setInput, textareaRef }: UseChatMentionProps) {
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
