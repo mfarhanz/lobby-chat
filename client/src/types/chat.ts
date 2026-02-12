@@ -66,3 +66,13 @@ export interface MessageReactionData {
 export type MediaValidationResult =
     | { ok: true }
     | { ok: false; reason: number };
+
+export type PasteResult =
+    | { type: "image"; url: string; file?: File }
+    | { type: "youtube"; videoId: string; url: string; thumbnail: string }
+    | { type: "spotify"; url: string; thumbnail: string; title?: string }
+    | { type: "twitter"; url: string; text?: string }
+    | { type: "github"; url: string; repo?: string }
+    | { type: "media"; error?: number }
+    | { type: "content"; error?: string }
+    | null;

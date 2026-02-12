@@ -21,7 +21,8 @@ import { Drawer } from "./Drawer";
 import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
 import { usePaste } from "../hooks/usePaste";
-import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction } from "../types/chat";
+import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult } from "../types/chat";
+
 
 export interface ChatProps {
     username: string,
@@ -208,7 +209,40 @@ export function Chat({
     };
 
     const { handlePaste } = usePaste({
-        callback: (src: string) => setEmbed(src)
+        callback: (result: PasteResult) => {
+            if (result) {
+                switch (result.type) {
+                    case "image":
+                        if (result.file) {          // if its a local file on device that was pasted
+                            setUploads(prev => {
+                                const combined: FileData[] = [
+                                    ...prev,
+                                    ...(result.file ? [{ file: result.file, url: result.url }] : [])
+                                ];
+                                return combined.slice(0, 4);
+                            });
+                        } else setEmbed(result.url);
+                        break;
+                    case "youtube":
+                        console.log("youtube URL detected:", result);
+                        break;
+                    case "spotify":
+                        console.log("spotify URL detected:", result);
+                        break;
+                    case "twitter":
+                        console.log("twitter URL detected:", result);
+                        break;
+                    case "github":
+                        console.log("github URL detected:", result);
+                        break;
+                    default:
+                        console.log("Error pasting content: ", result);
+                }
+            }
+            else {
+                console.log("Normal text pasted", result);
+            }
+        }
     });
 
     const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {

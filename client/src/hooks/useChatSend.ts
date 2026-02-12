@@ -36,7 +36,11 @@ export function useChatSend({
         // format text
         let sendText = input;
         if (embed) sendText += `\n\n![](${embed})`;     // append any image/gif embeds - this will rendered via markdown
-        sendText = sendText.replace(/@(\S+)/g, "[`@$1`](#ping)");       // format pings differently from text
+        sendText = sendText.replace(    // format pings differently from text
+            /(^|[\s.,;:!?])(?<!`)@(\S+)/g,
+            '$1[`@$2`](#ping)'
+        );
+        console.log(sendText);
 
         // send any attached files to temporary online storage
         const files = uploadsRef.current.map(u => u.file);

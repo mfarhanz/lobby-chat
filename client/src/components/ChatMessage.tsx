@@ -63,6 +63,16 @@ export function ChatMessage({
                 onClick={() => onImageClick(props.src ?? null)}
             />
         ),
+
+        a: (props: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+            <a
+                {...props}
+                rel="noopener noreferrer"
+                title={props.href}
+            >
+                {props.children}
+            </a>
+        ),
     };
 
     const longPress = useLongPress({
