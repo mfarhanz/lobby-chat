@@ -33,6 +33,12 @@ export interface MediaMeta {
     size: number;
 };
 
+export interface SessionUserStatsMeta {
+    messageCount: number;
+    joinedAt?: number;
+    lastActive?: number;
+}
+
 export interface SendPayload {
     text: string;
     images?: MediaMeta[];
@@ -51,7 +57,7 @@ export interface DOMEvent {
     onClick?: (ev: React.MouseEvent<HTMLDivElement>) => void;
     onTouchStart?: (ev: React.TouchEvent<HTMLDivElement>) => void;
     onTouchEnd?: (ev: React.TouchEvent<HTMLDivElement>) => void;
-    onLongPress?: () => void;
+    onLongPressMessage?: (msg: MessageData) => void;
 };
 
 export type MessageActionData =

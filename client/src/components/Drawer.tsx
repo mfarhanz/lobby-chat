@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { DrawerAction } from "../types/chat";
 
 interface DrawerProps {
@@ -6,7 +7,7 @@ interface DrawerProps {
     onClose: () => void;
 };
 
-export function Drawer({ open, actions, onClose }: DrawerProps) {
+export const Drawer = memo(function Drawer({ open, actions, onClose }: DrawerProps) {
     if (!open) return null;
 
     return (
@@ -44,4 +45,4 @@ export function Drawer({ open, actions, onClose }: DrawerProps) {
             </div>
         </>
     );
-}
+});

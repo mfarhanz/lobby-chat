@@ -1,48 +1,43 @@
 config:
-  target: "http://localhost:3000"
-  phases:
-    - duration: 90
-      arrivalRate: 10     # users/sec
-      maxVusers: 1000     # cap at 1000 concurrent
+  target: "http://localhost:3000/chat"
   engines:
     socketio: {}
 
+  phases:
+    - duration: 60       # total test duration (4 minutes)
+      arrivalRate: 5
+      maxVusers: 60
+
 scenarios:
-  # 🐢 Slow users (mostly idle)
-  - name: slow-users
-    weight: 50
+  - name: chat-user
     engine: socketio
     flow:
-      - think: 10
-      - emit:
-          channel: "chat-message"
-          data: "slow hello"
-      - think: 15
-
-  # 🚶 Normal users
-  - name: normal-users
-    weight: 35
-    engine: socketio
-    flow:
-      - emit:
-          channel: "chat-message"
-          data: "normal hello"
-      - think: 3
-      - emit:
-          channel: "chat-message"
-          data: "normal followup"
-      - think: 5
-
-  # ⚡ Fast typers (bursts)
-  - name: fast-users
-    weight: 15
-    engine: socketio
-    flow:
+      # Each user sends multiple messages over their lifetime
       - loop:
+          - think: 1
           - emit:
-              channel: "chat-message"
-              data: "FAST MESSAGE"
-          - think: 0.25
-        count: 6
-      - think: 5
+              channel: "send-message"
+              data:
+                text: "When she didnt like a guy who was trying to pick her up, she started using sign language."
+          - think: 2
+          - emit:
+              channel: "send-message"
+              data:
+                text: "Hows it going?"
+          - think: 1
+          - emit:
+              channel: "send-message"
+              data:
+                text: "I ate a sock because people on the Internet told me to."
+          - think: 3
+          - emit:
+              channel: "send-message"
+              data:
+                text: "There's a reason that roses have thorns"
+          - think: 2
+          - emit:
+              channel: "send-message"
+              data:
+                text: "Lol, thats funny"
+        count: 20   # 20× this loop → ~100 messages per user
 

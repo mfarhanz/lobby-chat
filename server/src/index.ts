@@ -11,18 +11,20 @@ dotenv.config();
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET as string;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN as string;
 const PORT = Number(process.env.PORT) || 3000;
-const MAX_CONNECTIONS = 15;
+const MAX_CONNECTIONS = 15000000;
 const MAX_MESSAGE_LENGTH = 5000;
-const SPAM_THRESHOLD = 15; // max messages
-const SPAM_TIME = 10000; // 10 seconds
+const SPAM_THRESHOLD = 150000; // max messages
+const SPAM_TIME = 10000000000; // 10 seconds
 
 const app = express();
-app.set("trust proxy", true);
+// app.set("trust proxy", true);
 const server = http.createServer(app);
 const io = new Server(server, {
-    path: "/socket",
+    // path: "/socket",
+    transports: ["polling", "websocket"],
     cors: {
-        origin: CLIENT_ORIGIN,
+        // origin: CLIENT_ORIGIN,
+        origin: "*",
         methods: ["GET", "POST"],
     },
 });
@@ -41,18 +43,18 @@ process.on("unhandledRejection", (err: unknown) => {
 });
 
 chat.use(async (socket: Socket & { _ip?: string }, next) => {
-    const ip =
-        (socket.handshake.headers["cf-connecting-ip"] as string) ||
-        (socket.handshake.headers["x-forwarded-for"] as string | undefined)
-            ?.split(",")[0] ||
-        socket.handshake.address;
-    socket._ip = ip;
+    // const ip =
+    //     (socket.handshake.headers["cf-connecting-ip"] as string) ||
+    //     (socket.handshake.headers["x-forwarded-for"] as string | undefined)
+    //         ?.split(",")[0] ||
+    //     socket.handshake.address;
+    // socket._ip = ip;
 
-    connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;     // temporary( no turnstile)
-    if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
-        connectionsPerIp[ip]--;
-        return next(new Error("Too many connections from this IP"));
-    }
+    // connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;     // temporary( no turnstile)
+    // if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
+    //     connectionsPerIp[ip]--;
+    //     return next(new Error("Too many connections from this IP"));
+    // }
     return next();
 
     // const token = socket.handshake.auth?.turnstileToken as string | undefined;

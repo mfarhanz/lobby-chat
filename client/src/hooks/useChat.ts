@@ -1,52 +1,55 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
-import type { MessageData, UserMeta, SendPayload } from "../types/chat";
+import type { MessageData, UserMeta, SendPayload, SessionUserStatsMeta } from "../types/chat";
 import { MAX_MESSAGE_REACTIONS } from "../constants/chat";
 
 export function useChat() {
-    const [messages, setMessages] = useState<MessageData[]>([]);
+    const [messages, setMessages] = useState<Map<string, MessageData>>(new Map());
+    const [messageOrder, setMessageOrder] = useState<string[]>([]);
+    const userStats = useRef<Record<string, SessionUserStatsMeta>>({});
     const [userCount, setUserCount] = useState(0);
     const [connected, setConnected] = useState(false);
-    const [users, setUsers] = useState<UserMeta[]>([]);
     const [username, setUsername] = useState<string>("");
+    const [users, setUsers] = useState<UserMeta[]>([]);
     const [socket, setSocket] = useState<Socket<
         ServerToClientEvents,
         ClientToServerEvents
     > | null>(null);
 
-    function startChat(turnstileToken?: string) {
+    const startChat = useCallback((turnstileToken?: string) => {
         if (socket) return;
 
         const newSocket = io(
             import.meta.env.VITE_SOCKET_URL + "/chat",
-            {
-                path: "/socket",
-                auth: turnstileToken ? { turnstileToken } : {},
-            }
+            // {
+            //     path: "/socket",
+            //     auth: turnstileToken ? { turnstileToken } : {},
+            // }
         );
 
         setSocket(newSocket);
-    }
+    }, [socket]);
 
-    function sendMessage(payload: SendPayload) {
+    const sendMessage = useCallback((payload: SendPayload) => {
         const hasText = payload.text.trim().length > 0;
         const hasImages = !!payload.images?.length;
         if (!hasText && !hasImages) return;
         socket?.emit("send-message", payload);
-    }
+    }, [socket]);
 
-    function deleteMessage(messageId: string) {
+    const deleteMessage = useCallback((messageId: string) => {
         socket?.emit("delete-message", messageId);
-    }
+    }, [socket]);
 
-    function editMessage(messageId: string, text: string) {
+    const editMessage = useCallback((messageId: string, text: string) => {
         socket?.emit("edit-message", { messageId, text });
-    };
+    }, [socket]);
 
-    function addReaction(messageId: string, emoji: string) {
+    const addReaction = useCallback((messageId: string, emoji: string) => {
         socket?.emit("add-reaction", { messageId, emoji });
-    }
+    }, [socket]);
+
 
     useEffect(() => {
         if (!socket) return;
@@ -89,11 +92,29 @@ export function useChat() {
                 if (validatedImages.length === 0) validatedImages = undefined;
             }
 
-            setMessages((prev) => [...prev, { id, user, text, timestamp, replyTo: validatedReplyTo, images: validatedImages }]);
+            setMessages(prev => {
+                const newMap = new Map(prev);
+                newMap.set(id, { id, user, text, timestamp, replyTo: validatedReplyTo, images: validatedImages });
+                return newMap;
+            });
+            setMessageOrder(prev => [...prev, id]);
+
+            // update user's stats in stats map whenever a new message is sent
+            const oldStats = userStats.current[user] ?? { messageCount: 0, lastActive: 0 };
+            userStats.current[user] = {
+                messageCount: oldStats.messageCount + 1,
+                lastActive: timestamp,
+            };
+
         };
 
         const handleDeleteMessage = (messageId: string) => {
-            setMessages(prev => prev.filter(m => m.id !== messageId));
+            setMessages(prev => {
+                const newMap = new Map(prev);
+                newMap.delete(messageId);
+                return newMap;
+            });
+            setMessageOrder(prev => prev.filter(msgId => msgId !== messageId));
         };
 
         const handleEditMessage = ({
@@ -103,11 +124,14 @@ export function useChat() {
             messageId: string;
             text: string;
         }) => {
-            setMessages(prev =>
-                prev.map(m =>
-                    m.id === messageId ? { ...m, text, edited: true } : m
-                )
-            );
+            setMessages(prev => {
+                const oldMsg = prev.get(messageId);
+                if (!oldMsg) return prev; // message doesn’t exist
+
+                const newMap = new Map(prev);
+                newMap.set(messageId, { ...oldMsg, text: text, edited: true });
+                return newMap;
+            });
         };
 
         const handleAddReaction = ({
@@ -120,42 +144,34 @@ export function useChat() {
             user: string
 
         }) => {
-            setMessages(prev =>
-                prev.map(m => {
-                    if (m.id !== messageId) return m;
+            setMessages(prev => {
+                const oldMsg = prev.get(messageId);
+                if (!oldMsg) return prev;
 
-                    const reactions = m.reactions ? [...m.reactions] : [];
-                    const existingIndex = reactions.findIndex(r => r.emoji === emoji);
+                const reactions = oldMsg.reactions ? [...oldMsg.reactions] : [];
+                const existingIndex = reactions.findIndex(r => r.emoji === emoji);
 
-                    if (existingIndex !== -1) {
-                        const existing = reactions[existingIndex];
-
-                        if (!existing.users.includes(user)) {
-                            reactions[existingIndex] = {
-                                ...existing,
-                                users: [...existing.users, user],
-                            };
-                        } else {
-                            const newUsers = existing.users.filter(u => u !== user);
-
-                            // remove entire reaction if no users left
-                            if (newUsers.length === 0) {
-                                reactions.splice(existingIndex, 1);
-                            } else {
-                                reactions[existingIndex] = {
-                                    ...existing,
-                                    users: newUsers,
-                                };
-                            }
-                        }
+                if (existingIndex !== -1) {
+                    const existing = reactions[existingIndex];
+                    if (!existing.users.includes(user)) {
+                        reactions[existingIndex] = { ...existing, users: [...existing.users, user] };
                     } else {
-                        if (reactions.length >= MAX_MESSAGE_REACTIONS) return m;
-                        reactions.push({ emoji, users: [user] });
+                        const newUsers = existing.users.filter(u => u !== user);
+                        if (newUsers.length === 0) {
+                            reactions.splice(existingIndex, 1);
+                        } else {
+                            reactions[existingIndex] = { ...existing, users: newUsers };
+                        }
                     }
+                } else {
+                    if (reactions.length >= MAX_MESSAGE_REACTIONS) return prev;
+                    reactions.push({ emoji, users: [user] });
+                }
 
-                    return { ...m, reactions };
-                })
-            );
+                const newMap = new Map(prev);
+                newMap.set(messageId, { ...oldMsg, reactions: reactions });
+                return newMap;
+            });
         };
 
         socket.on("connect", () => setConnected(true));
@@ -199,9 +215,11 @@ export function useChat() {
     return {
         connected,
         userCount,
-        messages,
+        userStats,
         users,
         username,
+        messages,
+        messageOrder,
         startChat,
         sendMessage,
         editMessage,

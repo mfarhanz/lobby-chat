@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 
-export function useTurnstile(startChat: (token: string) => void) {
+export function useTurnstile(startChat: (token?: string) => void) {
   const rendered = useRef(false);
 
   useEffect(() => {
     if (rendered.current) return;
     rendered.current = true;
 
-    startChat("w");   // temporary, just for dev
+    startChat();   // temporary, just for dev
 
     // // @ts-expect-error injected by CF script
     // window.turnstile.render("#turnstile-container", {

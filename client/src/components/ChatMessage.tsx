@@ -1,7 +1,5 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { lazy, Suspense, useCallback } from "react";
-import type { DOMEvent, MessageData } from "../types/chat";
 import { CheckIcon } from "./icons/CheckIcon";
 import { CopyIcon } from "./icons/CopyIcon";
 import { EditIcon } from "./icons/EditIcon";
@@ -13,6 +11,8 @@ import { IconButton } from "./IconButton";
 import { useLongPress } from "../hooks/useLongPress";
 import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
+import type { DOMEvent, MessageData } from "../types/chat";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo } from "react";
 
 interface ChatMessageProps extends DOMEvent {
     msg: MessageData;
@@ -35,7 +35,7 @@ interface ChatMessageProps extends DOMEvent {
 
 const EmojiPicker = lazy(() => import("./EmojiPicker"));
 
-export function ChatMessage({
+export const ChatMessage = memo(function ChatMessage({
     msg,
     username,
     today,
@@ -52,10 +52,14 @@ export function ChatMessage({
     onImageClick,
     onImageError,
     onSetEmojiPickerOpenId,
-    onLongPress
+    onLongPressMessage
 }: ChatMessageProps) {
 
-    const markdownComponents = {
+    useEffect(() => {
+        console.log("Rendered", msg.id);
+    });
+
+    const markdownComponents = useMemo(() => ({
         img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
             <img
                 {...props}
@@ -73,28 +77,27 @@ export function ChatMessage({
                 {props.children}
             </a>
         ),
-    };
+    }), [onImageClick]);
+
+    const handleLongPress = useCallback(() => {
+        onLongPressMessage?.(msg);
+    }, [onLongPressMessage, msg]);
 
     const longPress = useLongPress({
         delay: 500,
-        callback: () => {
-            if (onLongPress) onLongPress();
-        },
+        callback: handleLongPress,
     });
 
-    const handleEmojiReactionSelect = useCallback(
-        (emoji: string) => {
-            onAddReaction(msg.id, emoji);
-        },
-        [onAddReaction, msg.id]
-    );
+    const handleEmojiReactionSelect = useCallback((emoji: string) => {
+        onAddReaction(msg.id, emoji);
+        onSetEmojiPickerOpenId(null)
+    }, [onAddReaction, onSetEmojiPickerOpenId, msg.id]);
 
     const handleEmojiReactionClose = useCallback(() => {
         onSetEmojiPickerOpenId(null);
     }, [onSetEmojiPickerOpenId]);
 
     return (
-        // Chat Message
         <div
             ref={(el) => registerRef(msg.id, el)}
             className={`chat-message text-message relative 
@@ -129,12 +132,7 @@ export function ChatMessage({
             {!TOUCH_DEVICE && isEmojiPickerOpen && (
                 <Suspense fallback={<Spinner />}>
                     <EmojiPicker
-                        // onSelect={(emoji) => {
-                        //     onAddReaction(msg.id, emoji);
-                        //     onSetEmojiPickerOpenId(null);
-                        // }}
                         onSelect={handleEmojiReactionSelect}
-                        // onClose={() => onSetEmojiPickerOpenId(null)}
                         onClose={handleEmojiReactionClose}
                         className="absolute right-0 top-10 z-5"
                         navPosition="none"
@@ -258,4 +256,6 @@ export function ChatMessage({
             </div>
         </div>
     );
-}
+}, (prev, next) => {        // only re-render this chat message if any of these are false
+    return prev.msg === next.msg && prev.isCopied === next.isCopied && prev.isEmojiPickerOpen === next.isEmojiPickerOpen;
+});

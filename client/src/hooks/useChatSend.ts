@@ -40,7 +40,6 @@ export function useChatSend({
             /(^|[\s.,;:!?])(?<!`)@(\S+)/g,
             '$1[`@$2`](#ping)'
         );
-        console.log(sendText);
 
         // send any attached files to temporary online storage
         const files = uploadsRef.current.map(u => u.file);

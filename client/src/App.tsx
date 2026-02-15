@@ -1,5 +1,5 @@
 import "./App.css";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Chat } from "./components/Chat";
 import { UsersPanel } from "./components/UsersPanel";
 // import { TurnstileOverlay } from "./components/TurnstileOverlay";
@@ -9,9 +9,11 @@ export default function App() {
     const {
         connected,
         userCount,
-        messages,
+        userStats,
         users,
         username,
+        messages,
+        messageOrder,
         startChat,
         sendMessage,
         editMessage,
@@ -20,6 +22,11 @@ export default function App() {
     } = useChat();
 
     const [usersOpen, setUsersOpen] = useState(false);
+
+    const usernames = useMemo(
+        () => users.map(u => u.username),
+        [users]
+    );
 
     useEffect(() => {
         if (!usersOpen) return;
@@ -52,8 +59,9 @@ export default function App() {
             <main className="app-main">
                 <Chat
                     username={username}
-                    users={users.map(u => u.username)}
+                    users={usernames}
                     messages={messages}
+                    messageOrder={messageOrder}
                     connected={connected}
                     startChat={startChat}
                     sendMessage={sendMessage}
@@ -72,8 +80,8 @@ export default function App() {
                 <UsersPanel
                     username={username}
                     users={users}
-                    messages={messages}
                     userCount={userCount}
+                    userStats={userStats}
                     mobileView={usersOpen}
                 />
             </main>

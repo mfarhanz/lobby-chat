@@ -1,38 +1,28 @@
-import { useMemo, useState } from "react";
+import { memo, useState } from "react";
+import NumberFlow from "@number-flow/react";
 import { MobileIcon } from "./icons/MobileIcon";
 import { ComputerIcon } from "./icons/ComputerIcon";
-import type { MessageData, UserMeta } from "../types/chat";
-import NumberFlow from "@number-flow/react";
+import type { UserMeta, SessionUserStatsMeta } from "../types/chat";
 
 export interface UserProps {
     username: string;
     users: UserMeta[];
-    messages: MessageData[];
     userCount: number;
+    userStats: React.RefObject<Record<string, SessionUserStatsMeta>>;
     mobileView: boolean;
 };
 
-export function UsersPanel({
+export const UsersPanel = memo(function UsersPanel({
     username,
     users,
-    messages,
     userCount,
+    userStats,
     mobileView,
 }: UserProps) {
     const [activeUser, setActiveUser] = useState<{ username: string; joinedAt: number; } | null>(null);
     const [now, setNow] = useState<number>(() => Date.now());
 
-    const userStats = useMemo(() => {
-        const stats: Record<string, { count: number; lastActive: number }> = {};
-        messages.forEach((msg) => {
-            if (!stats[msg.user]) {
-                stats[msg.user] = { count: 0, lastActive: msg.timestamp };
-            }
-            stats[msg.user].count += 1;
-            stats[msg.user].lastActive = Math.max(stats[msg.user].lastActive, msg.timestamp);
-        });
-        return stats;
-    }, [messages]);
+    console.log("Userpanel render");
 
     function formatRelativeTime(timestamp: number, now: number): string {
         const diff = now - timestamp;
@@ -59,8 +49,10 @@ export function UsersPanel({
         <aside className={`users-panel ${mobileView ? "mobile-open" : ""}`}>
             <div className="flex-1 overflow-y-auto pr-1 space-y-2 hide-scrollbar">
                 {users.map((user) => {
-                    const stats = userStats[user.username] ?? { count: 0, lastActive: user.joinedAt };
                     const expand = activeUser?.username === user.username;
+                    const stats = userStats.current?.[user.username];
+                    const messageCount = stats?.messageCount ?? 0;
+                    const lastActive = stats?.lastActive ?? user.joinedAt;
 
                     return (
                         <div
@@ -91,12 +83,12 @@ export function UsersPanel({
                                     </span> ago
                                 </div>
                                 <div>
-                                    Last active <span className={`${timeColor(stats.lastActive, now)}`}>
-                                        {formatRelativeTime(stats.lastActive, now)}
+                                    Last active <span className={`${timeColor(lastActive, now)}`}>
+                                        {formatRelativeTime(lastActive, now)}
                                     </span> ago
                                 </div>
                                 <div>
-                                    Messages sent: <span className="text-indigo-400">{stats.count}</span>
+                                    Messages sent: <span className="text-indigo-400">{messageCount}</span>
                                 </div>
                                 <div className={`flex justify-end ${expand ? "scale-100" : "scale-0"} transition-transform duration-200`}>
                                     {user.device === "mobile" ? (
@@ -120,4 +112,4 @@ export function UsersPanel({
             </div>
         </aside>
     );
-}
+});

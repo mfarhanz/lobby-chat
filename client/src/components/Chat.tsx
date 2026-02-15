@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useRef, useState, lazy, Suspense, useMemo, memo } from "react";
 import { Thumbnail } from "./Thumbnail";
 import { EmojiIcon } from "./icons/EmojiIcon";
 import { ImageIcon } from "./icons/ImageIcon";
@@ -23,11 +23,11 @@ import { Spinner } from "./Spinner";
 import { usePaste } from "../hooks/usePaste";
 import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult } from "../types/chat";
 
-
 export interface ChatProps {
     username: string,
     users: string[],
-    messages: MessageData[];
+    messages: Map<string, MessageData>;
+    messageOrder: string[];
     connected: boolean;
     startChat: (token?: string) => void;
     sendMessage: (msg: SendPayload) => void;
@@ -39,10 +39,11 @@ export interface ChatProps {
 // lazy load the EmojiPicker
 const EmojiPicker = lazy(() => import("./EmojiPicker"));
 
-export function Chat({
+export const Chat = memo(function Chat({
     username,
     users,
     messages,
+    messageOrder,
     connected,
     startChat,
     sendMessage,
@@ -67,6 +68,10 @@ export function Chat({
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const isAtBottom = useRef(true);
+    const scrollTick = useRef(false);
+
+    const today = useCurrentDay();
+    const lastId = messageOrder.at(-1);  // message id of last sent message in chat
 
     const {
         uploads,
@@ -98,8 +103,206 @@ export function Chat({
         setAction,
     });
 
-    const drawerActions: DrawerAction[] = drawerMessage
-        ? [
+    console.log("Chat render");
+    const prevRef = useRef<unknown>(null);
+    useEffect(() => {
+        if (prevRef.current && prevRef.current !== deleteMessage) {
+            console.log("deleteMessage CHANGED reference!");
+        }
+        prevRef.current = deleteMessage;
+    });
+
+    useTurnstile(startChat);
+
+    useEffect(() => {
+        if (!embed) return;
+        return () => URL.revokeObjectURL(embed);
+    }, [embed]);
+
+    useEffect(() => {
+        return () => {
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        const el = messagesRef.current;
+        if (!el || !lastId) return;
+
+        const lastMessage = messages.get(lastId);
+
+        // 1. if already at bottom, always scroll
+        // 2. if scrolled up, scroll only if the last message is from the client
+        if (isAtBottom.current || lastMessage?.user === username) {
+            el.scrollTo({
+                top: el.scrollHeight,
+                behavior: "smooth",
+            });
+        }
+    }, [lastId, username]); // ignore warning
+
+    const onSend = useCallback(async () => {
+        if (!textareaRef.current) return;
+        await handleSend();
+
+        // reset local states
+        setEmbed(null);
+        setUploads([]);
+        // reset textarea height
+        if (textareaRef.current) textareaRef.current.style.height = "auto";
+    }, [handleSend, setEmbed, setUploads]);
+
+    const handleScroll = useCallback(() => {
+        if (scrollTick.current) return;
+        scrollTick.current = true;
+        requestAnimationFrame(() => {
+            const el = messagesRef.current;
+            if (el) isAtBottom.current = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
+            scrollTick.current = false;
+        });
+    }, []);
+
+    const { handlePaste } = usePaste({
+        callback: (result: PasteResult) => {
+            if (result) {
+                switch (result.type) {
+                    case "image":
+                        if (result.file) {          // if its a local file on device that was pasted
+                            setUploads(prev => {
+                                const combined: FileData[] = [
+                                    ...prev,
+                                    ...(result.file ? [{ file: result.file, url: result.url }] : [])
+                                ];
+                                return combined.slice(0, 4);
+                            });
+                        } else setEmbed(result.url);
+                        break;
+                    case "youtube":
+                        console.log("youtube URL detected:", result);
+                        break;
+                    case "spotify":
+                        console.log("spotify URL detected:", result);
+                        break;
+                    case "twitter":
+                        console.log("twitter URL detected:", result);
+                        break;
+                    case "github":
+                        console.log("github URL detected:", result);
+                        break;
+                    default:
+                        console.log("Error pasting content: ", result);
+                }
+            }
+            else {
+                console.log("Normal text pasted", result);
+            }
+        }
+    });
+
+    const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        if (!files.length) return;
+
+        const newPreviews = await Promise.all(files.map(async (file) => {
+            const url = URL.createObjectURL(file);
+            const result = await validateMedia(url, file);
+            if (!result.ok) {
+                URL.revokeObjectURL(url);
+                return null; // skip invalid
+            }
+            return { file, url };
+        }));
+
+        setUploads(prev => {
+            const combined = [...prev, ...newPreviews.filter((x): x is FileData => x !== null)];
+            return combined.slice(0, 4);
+        });
+
+        e.target.value = "";
+    }, [validateMedia, setUploads]);
+
+    const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+        const el = e.currentTarget;
+        if (el.src !== PLACEHOLDER_IMG) {
+            el.src = PLACEHOLDER_IMG;
+            el.alt = "Could not display image";
+            el.title = "Could not display image";
+        }
+    }, []);
+
+    const handleEmojiInputSelect = useCallback((emoji: string) => {
+        setInput((v) => v + emoji);
+    }, []);
+
+    const handleEmojiInputClose = useCallback(() => {
+        setShowEmojiPicker(false);
+    }, []);
+
+    const handleEmojiReactionSelect = useCallback((emoji: string) => {
+        if (emojiPickerOpenId) {
+            addReaction(emojiPickerOpenId, emoji);
+            setEmojiPickerOpenId(null);
+        }
+    }, [emojiPickerOpenId, addReaction, setEmojiPickerOpenId]);
+
+    const handleEmojiReactionClose = useCallback(() => {
+        setEmojiPickerOpenId(null)
+    }, []);
+
+    const handleCloseDrawer = useCallback(() => {
+        setDrawerMessage(null);
+    }, []);
+
+    const onLongPress = useCallback((msg: MessageData) => {
+        if (TOUCH_DEVICE) setDrawerMessage(msg);
+    }, []);
+
+    const registerMessageRef = useCallback((id: string, el: HTMLDivElement | null) => {
+        if (el) {
+            messageRefs.current[id] = el;
+        }
+    }, []);
+
+    const scrollToMessage = useCallback((id: string) => {
+        const el = messageRefs.current[id];
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }, []);
+
+    const onEditMessage = useCallback((m: MessageData) => {
+        setAction({ type: "edit", messageId: m.id });
+        setInput(m.text);
+        textareaRef.current?.focus();
+    }, []);
+
+    const onCopyMessage = useCallback((m: MessageData) => {
+        navigator.clipboard.writeText(m.text);
+        if (!TOUCH_DEVICE) {
+            setCopydId(m.id);
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+            }
+            copyTimeoutRef.current = window.setTimeout(() => {
+                setCopydId(null);
+            }, 2000);
+        }
+    }, []);
+
+    const onReplyMessage = useCallback((m: MessageData) => {
+        setAction({
+            type: "reply",
+            name: m.user,
+            messageId: m.id,
+        });
+        textareaRef.current?.focus();
+    }, []);
+
+    const drawerActions = useMemo<DrawerAction[]>(() => {
+        if (!drawerMessage) return [];
+        return [
             {
                 key: "reaction",
                 label: "Add reaction",
@@ -150,193 +353,8 @@ export function Chat({
                     },
                 ]
                 : []),
-        ]
-        : [];
-
-    const today = useCurrentDay();
-
-    useTurnstile(startChat);
-
-    useEffect(() => {
-        return () => {
-            if (copyTimeoutRef.current) {
-                clearTimeout(copyTimeoutRef.current);
-            }
-        };
-    }, []);
-
-    useEffect(() => {
-        const el = messagesRef.current;
-        if (!el) return;
-
-        const lastMessage = messages[messages.length - 1];
-
-        // 1. if already at bottom, always scroll
-        // 2. if scrolled up, scroll only if the last message is from the client
-        if (isAtBottom.current || lastMessage?.user === username) {
-            el.scrollTo({
-                top: el.scrollHeight,
-                behavior: "smooth",
-            });
-        }
-    }, [messages, username]);
-
-    useEffect(() => {
-        return () => {
-            if (embed) URL.revokeObjectURL(embed);
-        };
-    }, [embed]);
-
-    const onSend = async () => {
-        if (!textareaRef.current) return;
-        await handleSend();
-
-        // reset local states
-        setEmbed(null);
-        setUploads([]);
-        // reset textarea height
-        if (textareaRef.current) textareaRef.current.style.height = "auto";
-    };
-
-    const checkIfAtBottom = (el: HTMLDivElement) => {
-        return el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
-    };
-
-    const handleScroll = () => {
-        const el = messagesRef.current;
-        if (!el) return;
-        isAtBottom.current = checkIfAtBottom(el);
-    };
-
-    const { handlePaste } = usePaste({
-        callback: (result: PasteResult) => {
-            if (result) {
-                switch (result.type) {
-                    case "image":
-                        if (result.file) {          // if its a local file on device that was pasted
-                            setUploads(prev => {
-                                const combined: FileData[] = [
-                                    ...prev,
-                                    ...(result.file ? [{ file: result.file, url: result.url }] : [])
-                                ];
-                                return combined.slice(0, 4);
-                            });
-                        } else setEmbed(result.url);
-                        break;
-                    case "youtube":
-                        console.log("youtube URL detected:", result);
-                        break;
-                    case "spotify":
-                        console.log("spotify URL detected:", result);
-                        break;
-                    case "twitter":
-                        console.log("twitter URL detected:", result);
-                        break;
-                    case "github":
-                        console.log("github URL detected:", result);
-                        break;
-                    default:
-                        console.log("Error pasting content: ", result);
-                }
-            }
-            else {
-                console.log("Normal text pasted", result);
-            }
-        }
-    });
-
-    const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files ?? []);
-        if (!files.length) return;
-
-        const newPreviews = await Promise.all(files.map(async (file) => {
-            const url = URL.createObjectURL(file);
-            const result = await validateMedia(url, file);
-            if (!result.ok) {
-                URL.revokeObjectURL(url);
-                return null; // skip invalid
-            }
-            return { file, url };
-        }));
-
-        setUploads(prev => {
-            const combined = [...prev, ...newPreviews.filter((x): x is FileData => x !== null)];
-            return combined.slice(0, 4);
-        });
-
-        e.target.value = "";
-    };
-
-    const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-        const el = e.currentTarget;
-        if (el.src !== PLACEHOLDER_IMG) {
-            el.src = PLACEHOLDER_IMG;
-            el.alt = "Could not display image";
-            el.title = "Could not display image";
-        }
-    }, []);
-
-    const handleEmojiInputSelect = useCallback((emoji: string) => {
-        setInput((v) => v + emoji);
-    }, []);
-
-    const handleEmojiInputClose = useCallback(() => {
-        setShowEmojiPicker(false);
-    }, []);
-
-    const handleEmojiReactionSelect = useCallback((emoji: string) => {
-        if (emojiPickerOpenId) {
-            addReaction(emojiPickerOpenId, emoji);
-            setEmojiPickerOpenId(null);
-        }
-    }, [emojiPickerOpenId, addReaction, setEmojiPickerOpenId]);
-
-    const handleEmojiReactionClose = useCallback(() => {
-        setEmojiPickerOpenId(null)
-    }, []);
-
-    const onLongPress = useCallback((msg: MessageData) => {
-        if (TOUCH_DEVICE) setDrawerMessage(msg);
-    }, []);
-
-    const registerMessageRef = useCallback((id: string, el: HTMLDivElement | null) => {
-        if (el) {
-            messageRefs.current[id] = el;
-        }
-    }, []);
-
-    const scrollToMessage = useCallback((id: string) => {
-        const el = messageRefs.current[id];
-        if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-    }, []);
-
-    const onEditMessage = useCallback((m: MessageData) => {
-        setAction({ type: "edit", messageId: m.id });
-        setInput(m.text);
-        textareaRef.current?.focus();
-    }, []);
-
-    const onCopyMessage = useCallback((m: MessageData) => {
-        navigator.clipboard.writeText(m.text);
-        setCopydId(m.id);
-        if (copyTimeoutRef.current) {
-            clearTimeout(copyTimeoutRef.current);
-        }
-        copyTimeoutRef.current = window.setTimeout(() => {
-            setCopydId(null);
-        }, 2000);
-    }, []);
-
-    const onReplyMessage = useCallback((m: MessageData) => {
-        setAction({
-            type: "reply",
-            name: m.user,
-            messageId: m.id,
-        });
-        textareaRef.current?.focus();
-    }, []);
+        ];
+    }, [drawerMessage, username, onReplyMessage, onCopyMessage, onEditMessage, deleteMessage, setEmojiPickerOpenId]);
 
     return (
         <section className="chat-panel">
@@ -346,15 +364,13 @@ export function Chat({
                 className="chat-messages scrollbar-custom"
                 onScroll={handleScroll}
             >
-                {messages.map((msg) => {
-
-                    const replyToMessage =
-                        msg.replyTo
-                            ? messages.find(m => m.id === msg.replyTo?.id) ?? null
-                            : null;
-
+                {messageOrder.map((msgId) => {
+                    const msg = messages.get(msgId);
+                    if (!msg) return null;
+                    const replyToMessage = msg.replyTo ? messages.get(msg.replyTo.id) ?? null : null;
                     return (
                         <ChatMessage
+                            key={msgId}
                             msg={msg}
                             username={username}
                             today={today}
@@ -371,7 +387,7 @@ export function Chat({
                             onImageClick={setActiveImage}
                             onImageError={handleImageError}
                             onSetEmojiPickerOpenId={setEmojiPickerOpenId}
-                            onLongPress={() => onLongPress(msg)}
+                            onLongPressMessage={onLongPress}
                         />
                     );
                 })}
@@ -380,7 +396,7 @@ export function Chat({
                 <Drawer
                     open={!!drawerMessage}
                     actions={drawerActions}
-                    onClose={() => setDrawerMessage(null)}
+                    onClose={handleCloseDrawer}
                 />
 
                 {/* Image View Popup - on clicking any media */}
@@ -562,4 +578,10 @@ export function Chat({
             )}
         </section>
     );
-}
+}, (prev, next) => {   // stricter comparator rule to only rerender the chat if messages state has changed and on socket connection
+    return (
+          prev.messages === next.messages &&
+          prev.messageOrder === next.messageOrder &&
+          prev.connected === next.connected
+      );
+});
