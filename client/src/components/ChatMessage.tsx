@@ -18,7 +18,6 @@ interface ChatMessageProps extends DOMEvent {
     msg: MessageData;
     username: string;
     today: Date;
-    registerRef: (id: string, el: HTMLDivElement | null) => void;
     onReplyJump: (id: string) => void;
     replyingTo: MessageData | null;
     isEmojiPickerOpen: boolean;
@@ -26,10 +25,11 @@ interface ChatMessageProps extends DOMEvent {
     onCopy: (msg: MessageData) => void;
     onReply: (msg: MessageData) => void;
     onEdit: (msg: MessageData) => void;
-    onDelete: (id: string) => void;
+    onDelete: (msg: MessageData) => void;
     onAddReaction: (messageId: string, emoji: string) => void;
     onImageClick: (src: string | null) => void;
     onImageError: (ev: React.SyntheticEvent<HTMLImageElement, Event>) => void;
+    onSizeChange?: () => void;
     onSetEmojiPickerOpenId: (id: string | null) => void;
 };
 
@@ -39,7 +39,6 @@ export const ChatMessage = memo(function ChatMessage({
     msg,
     username,
     today,
-    registerRef,
     onReplyJump,
     replyingTo,
     isEmojiPickerOpen,
@@ -51,13 +50,14 @@ export const ChatMessage = memo(function ChatMessage({
     onAddReaction,
     onImageClick,
     onImageError,
+    onSizeChange,
     onSetEmojiPickerOpenId,
     onLongPressMessage
 }: ChatMessageProps) {
 
-    useEffect(() => {
-        console.log("Rendered", msg.id);
-    });
+    // useEffect(() => {
+    //     console.log("Rendered", msg.id);
+    // });
 
     const markdownComponents = useMemo(() => ({
         img: (props: React.ImgHTMLAttributes<HTMLImageElement>) => (
@@ -99,8 +99,7 @@ export const ChatMessage = memo(function ChatMessage({
 
     return (
         <div
-            ref={(el) => registerRef(msg.id, el)}
-            className={`chat-message text-message relative 
+            className={`chat-message text-message 
                         ${msg.user === username ? "chat-message-self" : ""}
                         ${(msg.replyTo?.user === username || msg.text.includes(`@${username}`)) ? "chat-message-ping" : ""}
                         `}
@@ -171,7 +170,7 @@ export const ChatMessage = memo(function ChatMessage({
                             icon={<TrashIcon className="size-4" />}
                             title="Delete"
                             className="text-xs"
-                            onClick={() => onDelete(msg.id)}
+                            onClick={() => onDelete(msg)}
                         />
                     )}
 
@@ -215,9 +214,10 @@ export const ChatMessage = memo(function ChatMessage({
                     <img
                         src={msg.images[0].url}
                         alt="uploaded"
-                        className="chat-message-image-single"
+                        className="chat-message-image-single"   // fixed aspect ratio not used here to preserve image dims
                         loading="lazy"
                         onClick={() => onImageClick(msg.images?.[0].url ?? null)}
+                        onLoad={() => onSizeChange?.()}     // needed to readjust chatmessage height after virtualization
                         onError={onImageError}
                     />
                 ) : (

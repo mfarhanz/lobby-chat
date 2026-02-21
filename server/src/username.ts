@@ -43,6 +43,7 @@ type UserFormatMapParams = {
 // function references (used in UserFormatMap)
 const C = capitalize;
 const U = (word: string) => word.toUpperCase();
+const L = (word: string) => word.toLowerCase();
 
 // map of username formats
 const UserFormatMap: Record<number, (p: UserFormatMapParams) => string> = {
@@ -57,9 +58,9 @@ const UserFormatMap: Record<number, (p: UserFormatMapParams) => string> = {
     8: ({ n, x, n2 }) => `${n}_of_${n2}${x}`,
     9: ({ n, adj, x }) => `${C(adj!)}${C(n!)}${x}`,
     10: ({ n, adj, adv }) => `${adv}_${adj}_${n}`,
-    11: ({ n, j }) => `${n}${j}4life`,
+    11: ({ n, j }) => `${n}${L(j!)}4life`,
     12: ({ adj, x, adv }) => `${C(adv!)}${C(adj!)}${x}`,
-    13: ({ g, j, x }) => `${g}4${j}s${x}`,
+    13: ({ g, j, x }) => `${g}4${L(j!)}s${x}`,
     14: ({ n, adj, x }) => `The${C(adj!)}${C(n!)}${x}`,
     15: ({ n, x, n2 }) => `${C(n!)}InThe${C(n2!)}${x}`,
     16: ({ n, x, v }) => `I${C(v!)}${C(n!)}s${x}`,
@@ -75,13 +76,14 @@ const UserFormatMap: Record<number, (p: UserFormatMapParams) => string> = {
     26: ({ n, j, x }) => `${C(j!)}_of_${C(n!)}s${x!%100}`,
     27: ({ n, adj, x }) => `${adj}${C(n!)}_${x}`,
     28: ({ n, t, j }) => `${C(t!)}${C(n!)}${C(j!)}`,
-    29: ({ adj, n, j }) => `${adj}${n}${j}`,
+    29: ({ adj, n, j }) => `${adj}${n}${L(j!)}`,
     30: ({ n, v }) => `${C(v!)}The${C(n!)}`,
     31: ({ v, v2, x }) => `BORN2${v}FORCED2${v2}${x}`,
     32: ({ n, pp, x }) => `my_${n}s_got_${pp}${x}`,
     33: ({ n, adj, adv }) => `${adv}${adj}${n}`,
     34: ({ n, adj, x }) => `${adj}${n}${x! % 100}`,
     35: ({ n, adj, x }) => `${adj}_${n}${x}`,
+    36: ({ g, t, j }) => `${C(t!)}${C(j!)}Of${C(g!)}`,
 };
 
 export function generateUsername(): string {

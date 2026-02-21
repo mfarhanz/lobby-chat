@@ -81,7 +81,7 @@ body {
     background: transparent;
   }
 
-    .hide-scrollbar::-webkit-scrollbar {
+  .hide-scrollbar::-webkit-scrollbar {
     /* hide scrollbar but allow scrolling */
     display: none;
   }
@@ -141,11 +141,11 @@ body {
   }
 
   .chat-messages {
-    @apply flex-1 overflow-y-auto rounded-lg bg-zinc-800 p-3 space-y-2 overflow-x-hidden;
+    @apply flex-1 overflow-hidden rounded-lg bg-zinc-800;
   }
 
   .chat-message {
-    @apply relative rounded-md px-3 py-1.5 leading-relaxed;
+    @apply relative rounded-md px-3 py-1.5;
     @apply bg-transparent;
   }
 

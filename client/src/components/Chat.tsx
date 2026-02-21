@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState, lazy, Suspense, useMemo, memo } from "react";
+import { useCallback, useEffect, useRef, useState, lazy, Suspense, useMemo, memo, useLayoutEffect } from "react";
+import { VariableSizeList } from 'react-window';
 import { Thumbnail } from "./Thumbnail";
 import { EmojiIcon } from "./icons/EmojiIcon";
 import { ImageIcon } from "./icons/ImageIcon";
+import { ChatWindow } from "./ChatWindow";
 import { ChatActionBar } from "./ChatActionBar";
 import { useChatUpload } from "../hooks/useChatUpload";
 import { useChatMention } from "../hooks/useChatMention";
@@ -10,7 +12,6 @@ import { useTurnstile } from "../hooks/useTurnstile";
 import { validateMedia } from "../utils/media";
 import { PLACEHOLDER_IMG } from "../constants/chat";
 import { useChatSend } from "../hooks/useChatSend";
-import { ChatMessage } from "./ChatMessage";
 import { IconButton } from "./IconButton";
 import { EditIcon } from "./icons/EditIcon";
 import { TrashIcon } from "./icons/TrashIcon";
@@ -32,7 +33,7 @@ export interface ChatProps {
     startChat: (token?: string) => void;
     sendMessage: (msg: SendPayload) => void;
     editMessage: (messageId: string, text: string) => void;
-    deleteMessage: (msg: string) => void;
+    deleteMessage: (messageId: string) => void;
     addReaction: (messageId: string, emoji: string) => void;
 };
 
@@ -63,12 +64,23 @@ export const Chat = memo(function Chat({
 
     const [drawerMessage, setDrawerMessage] = useState<MessageData | null>(null);
 
+    const [chatHeight, setChatHeight] = useState(0);
+
     const messagesRef = useRef<HTMLDivElement | null>(null);
-    const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const sizeMap = useRef(new Map<string, number>());
+    const listRef = useRef<VariableSizeList>(null);
+    const outerRef = useRef<HTMLDivElement | null>(null);
+    const rowRefs = useRef(new Map<string, HTMLDivElement>());
+
     const isAtBottom = useRef(true);
-    const scrollTick = useRef(false);
+    const scrollRafScheduled = useRef(false);
+    const pendingScrollOffset = useRef<number | null>(null);
+    // for batching height measurements per frame
+    const measureRafScheduled = useRef(false);
+    const pendingMeasurements = useRef<Array<{ msgId: string; index: number; el: HTMLDivElement }>>([]);
+    const pendingResetIndex = useRef<number | null>(null);
 
     const today = useCurrentDay();
     const lastId = messageOrder.at(-1);  // message id of last sent message in chat
@@ -103,14 +115,14 @@ export const Chat = memo(function Chat({
         setAction,
     });
 
-    console.log("Chat render");
-    const prevRef = useRef<unknown>(null);
-    useEffect(() => {
-        if (prevRef.current && prevRef.current !== deleteMessage) {
-            console.log("deleteMessage CHANGED reference!");
-        }
-        prevRef.current = deleteMessage;
-    });
+    // console.log("Chat render");
+    // const prevRef = useRef<unknown>(null);
+    // useEffect(() => {
+    //     if (prevRef.current && prevRef.current !== deleteMessage) {
+    //         console.log("deleteMessage CHANGED reference!");
+    //     }
+    //     prevRef.current = deleteMessage;
+    // });
 
     useTurnstile(startChat);
 
@@ -127,21 +139,116 @@ export const Chat = memo(function Chat({
         };
     }, []);
 
+    const scrollToListEndSmooth = () => {
+        const el = outerRef.current;
+        if (!el) return;
+
+        el.scrollTo({
+            top: el.scrollHeight,
+            behavior: "smooth",
+        });
+    };
+
     useEffect(() => {
-        const el = messagesRef.current;
-        if (!el || !lastId) return;
+        if (!lastId) return;
 
         const lastMessage = messages.get(lastId);
-
-        // 1. if already at bottom, always scroll
-        // 2. if scrolled up, scroll only if the last message is from the client
-        if (isAtBottom.current || lastMessage?.user === username) {
-            el.scrollTo({
-                top: el.scrollHeight,
-                behavior: "smooth",
-            });
+        if (isAtBottom.current) {
+            scrollToListEndSmooth();
+        } else if (lastMessage?.user === username) {
+            listRef.current?.scrollToItem(messageOrder.length - 1, "end");
         }
-    }, [lastId, username]); // ignore warning
+    }, [lastId, username]);    // ignore warning, do not add messages or messageOrder here!
+
+    useLayoutEffect(() => {
+        if (!messagesRef.current) return;
+
+        const el = messagesRef.current;
+        const observer = new ResizeObserver(() => {
+            setChatHeight(el.clientHeight);
+        });
+
+        observer.observe(el);
+        setChatHeight(el.clientHeight);
+        return () => observer.disconnect();
+    }, []);
+
+    // 'unthrottled' version - not sure if throttled version makes a difference
+    // const handleScroll = useCallback((scrollOffset: number) => {     // even if this is called a shitload, its actually still fine
+    //     if (scrollTick.current) return;
+    //     scrollTick.current = true;
+
+    //     requestAnimationFrame(() => {
+    //         const el = outerRef.current;
+    //         if (!el) {
+    //             scrollTick.current = false;
+    //             return;
+    //         }
+
+    //         const { scrollHeight, clientHeight } = el;
+    //         isAtBottom.current = scrollHeight - scrollOffset <= clientHeight + 10;
+    //         scrollTick.current = false;
+    //     });
+    // }, []);
+
+    const getSize = useCallback((index: number) => {
+        const id = messageOrder[index];
+        return sizeMap.current.get(id) ?? 83; // TODO: change hardcoded value later
+    }, [messageOrder]);
+
+    const messageIndexMap = useMemo(() => {
+        const map = new Map<string, number>();
+        messageOrder.forEach((id, i) => map.set(id, i));
+        return map;
+    }, [messageOrder]);
+
+    const scrollToMessage = useCallback((id: string) => {
+        const index = messageIndexMap.get(id);
+        if (index != null) listRef.current?.scrollToItem(index, "center");
+    }, [messageIndexMap]);
+
+    const registerRef = useCallback(
+        (msgId: string, index: number) =>
+            (el: HTMLDivElement | null) => {
+                if (!el) {
+                    rowRefs.current.delete(msgId);
+                    return;
+                }
+
+                rowRefs.current.set(msgId, el);
+                pendingMeasurements.current.push({ msgId, index, el });
+
+                if (measureRafScheduled.current) return;
+                measureRafScheduled.current = true;
+
+                requestAnimationFrame(() => {
+                    // Measuring all queued rows in this frame
+                    for (const { msgId, index, el } of pendingMeasurements.current) {
+                        const h = el.getBoundingClientRect().height;
+                        const old = sizeMap.current.get(msgId);
+
+                        if (old !== h) {
+                            sizeMap.current.set(msgId, h);
+
+                            // Track smallest index needing reset
+                            if (pendingResetIndex.current === null || index < pendingResetIndex.current)
+                                pendingResetIndex.current = index;
+                        }
+                    }
+
+                    // Single resetAfterIndex per frame
+                    if (pendingResetIndex.current != null) {
+                        listRef.current?.resetAfterIndex(pendingResetIndex.current, true);
+                    }
+
+                    // cleanup
+                    pendingMeasurements.current = [];
+                    pendingResetIndex.current = null;
+                    measureRafScheduled.current = false;
+                });
+            },
+        []
+    );
 
     const onSend = useCallback(async () => {
         if (!textareaRef.current) return;
@@ -153,16 +260,6 @@ export const Chat = memo(function Chat({
         // reset textarea height
         if (textareaRef.current) textareaRef.current.style.height = "auto";
     }, [handleSend, setEmbed, setUploads]);
-
-    const handleScroll = useCallback(() => {
-        if (scrollTick.current) return;
-        scrollTick.current = true;
-        requestAnimationFrame(() => {
-            const el = messagesRef.current;
-            if (el) isAtBottom.current = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
-            scrollTick.current = false;
-        });
-    }, []);
 
     const { handlePaste } = usePaste({
         callback: (result: PasteResult) => {
@@ -201,6 +298,29 @@ export const Chat = memo(function Chat({
         }
     });
 
+    // throttled onScroll internal handler
+    const handleScroll = useCallback((scrollOffset: number) => {
+        pendingScrollOffset.current = scrollOffset;
+
+        if (scrollRafScheduled.current) return;
+        scrollRafScheduled.current = true;
+
+        requestAnimationFrame(() => {
+            const el = outerRef.current;
+            if (!el || pendingScrollOffset.current == null) {
+                scrollRafScheduled.current = false;
+                return;
+            }
+
+            const { scrollHeight, clientHeight } = el;
+            const offset = pendingScrollOffset.current;
+
+            isAtBottom.current = scrollHeight - offset <= clientHeight + 10;
+
+            scrollRafScheduled.current = false;
+        });
+    }, []);
+
     const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files ?? []);
         if (!files.length) return;
@@ -221,7 +341,7 @@ export const Chat = memo(function Chat({
         });
 
         e.target.value = "";
-    }, [validateMedia, setUploads]);
+    }, [setUploads]);
 
     const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
         const el = e.currentTarget;
@@ -259,19 +379,6 @@ export const Chat = memo(function Chat({
         if (TOUCH_DEVICE) setDrawerMessage(msg);
     }, []);
 
-    const registerMessageRef = useCallback((id: string, el: HTMLDivElement | null) => {
-        if (el) {
-            messageRefs.current[id] = el;
-        }
-    }, []);
-
-    const scrollToMessage = useCallback((id: string) => {
-        const el = messageRefs.current[id];
-        if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-    }, []);
-
     const onEditMessage = useCallback((m: MessageData) => {
         setAction({ type: "edit", messageId: m.id });
         setInput(m.text);
@@ -299,6 +406,16 @@ export const Chat = memo(function Chat({
         });
         textareaRef.current?.focus();
     }, []);
+
+    const onDeleteMessage = useCallback((m: MessageData) => {
+        const index = messageOrder.indexOf(m.id);
+        sizeMap.current.delete(m.id);
+        rowRefs.current.delete(m.id);
+        deleteMessage(m.id);
+        requestAnimationFrame(() => {
+            listRef.current?.resetAfterIndex(Math.max(0, index - 1), true);
+        });
+    }, [messageOrder, deleteMessage]);
 
     const drawerActions = useMemo<DrawerAction[]>(() => {
         if (!drawerMessage) return [];
@@ -347,74 +464,67 @@ export const Chat = memo(function Chat({
                         icon: <TrashIcon />,
                         destructive: true,
                         onPress: () => {
-                            deleteMessage(drawerMessage.id);
+                            onDeleteMessage(drawerMessage);
                             setDrawerMessage(null);
                         },
                     },
                 ]
                 : []),
         ];
-    }, [drawerMessage, username, onReplyMessage, onCopyMessage, onEditMessage, deleteMessage, setEmojiPickerOpenId]);
+    }, [username, drawerMessage, onReplyMessage, onCopyMessage, onEditMessage, onDeleteMessage, setEmojiPickerOpenId]);
+
+    const itemData = useMemo(() => ({
+        messages,
+        messageOrder,
+        username,
+        today,
+        copyId,
+        emojiPickerOpenId,
+        registerRef,
+        scrollToMessage,
+        sizeMap,
+        listRef,
+        rowRefs,
+        handlers: {
+            onCopy: onCopyMessage,
+            onReply: onReplyMessage,
+            onEdit: onEditMessage,
+            onDelete: onDeleteMessage,
+            onAddReaction: addReaction,
+            onImageClick: setActiveImage,
+            onImageError: handleImageError,
+            onSetEmojiPickerOpenId: setEmojiPickerOpenId,
+            onLongPressMessage: onLongPress,
+        }
+    }), [messages, messageOrder, username, today, copyId, emojiPickerOpenId, registerRef, scrollToMessage,
+         onCopyMessage, onReplyMessage, onEditMessage, onDeleteMessage, addReaction, handleImageError, onLongPress]);
 
     return (
         <section className="chat-panel">
             {/* Messages area/window */}
             <div
                 ref={messagesRef}
-                className="chat-messages scrollbar-custom"
-                onScroll={handleScroll}
+                className="chat-messages "
             >
-                {messageOrder.map((msgId) => {
-                    const msg = messages.get(msgId);
-                    if (!msg) return null;
-                    const replyToMessage = msg.replyTo ? messages.get(msg.replyTo.id) ?? null : null;
-                    return (
-                        <ChatMessage
-                            key={msgId}
-                            msg={msg}
-                            username={username}
-                            today={today}
-                            registerRef={registerMessageRef}
-                            onReplyJump={scrollToMessage}
-                            replyingTo={replyToMessage}
-                            isEmojiPickerOpen={emojiPickerOpenId === msg.id}
-                            isCopied={copyId === msg.id}
-                            onCopy={onCopyMessage}
-                            onReply={onReplyMessage}
-                            onEdit={onEditMessage}
-                            onDelete={deleteMessage}
-                            onAddReaction={addReaction}
-                            onImageClick={setActiveImage}
-                            onImageError={handleImageError}
-                            onSetEmojiPickerOpenId={setEmojiPickerOpenId}
-                            onLongPressMessage={onLongPress}
-                        />
-                    );
-                })}
-
-                {/* Message Actions - for touchscreen only */}
-                <Drawer
-                    open={!!drawerMessage}
-                    actions={drawerActions}
-                    onClose={handleCloseDrawer}
-                />
-
-                {/* Image View Popup - on clicking any media */}
-                {activeImage && (
-                    <div
-                        className="fixed inset-0 z-50 bg-black/80
-                   flex items-center justify-center"
-                        onClick={() => setActiveImage(null)}
+                {chatHeight > 0 && (
+                    <VariableSizeList
+                        ref={listRef}
+                        outerRef={outerRef}
+                        height={chatHeight}
+                        width="100%"
+                        className="scrollbar-custom"
+                        itemCount={messageOrder.length}
+                        itemSize={getSize}
+                        itemData={itemData}
+                        overscanCount={1}
+                        onScroll={({ scrollOffset }) => handleScroll(scrollOffset)}
+                    // onItemsRendered={({ visibleStartIndex, visibleStopIndex }) => {
+                    //     console.log("Visible items:", visibleStopIndex - visibleStartIndex + 1);
+                    // }}
                     >
-                        <img
-                            src={activeImage}
-                            alt="full size"
-                            className="max-w-[90vw] max-h-[90vh] object-contain rounded-md"
-                            onClick={(e) => e.stopPropagation()}
-                        />
-                    </div>
+                        {ChatWindow}
+                    </VariableSizeList>
                 )}
-
             </div>
 
             {/* Chat Input area */}
@@ -539,6 +649,22 @@ export const Chat = memo(function Chat({
                 </button>
             </div>
 
+            {/* Image View Popup - on clicking any media */}
+            {activeImage && (
+                <div
+                    className="fixed inset-0 z-50 bg-black/80
+                   flex items-center justify-center"
+                    onClick={() => setActiveImage(null)}
+                >
+                    <img
+                        src={activeImage}
+                        alt="full size"
+                        className="max-w-[90vw] max-h-[90vh] object-contain rounded-md"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
+
             {/* Chat input emoji picker - mobile only */}
             {TOUCH_DEVICE && showEmojiPicker && (
                 <Suspense fallback={<Spinner />}>
@@ -553,6 +679,13 @@ export const Chat = memo(function Chat({
                     </div>
                 </Suspense>
             )}
+
+            {/* Message Actions - for touchscreen only */}
+            <Drawer
+                open={!!drawerMessage}
+                actions={drawerActions}
+                onClose={handleCloseDrawer}
+            />
 
             {/* Drawer Emoji Picker - for reactions on touchscreen only*/}
             {TOUCH_DEVICE && emojiPickerOpenId && (
@@ -578,10 +711,10 @@ export const Chat = memo(function Chat({
             )}
         </section>
     );
-}, (prev, next) => {   // stricter comparator rule to only rerender the chat if messages state has changed and on socket connection
+}, (prev, next) => {  // additional strict comparator rule to only rerender the chat if messages state has changed and on socket connection
     return (
-          prev.messages === next.messages &&
-          prev.messageOrder === next.messageOrder &&
-          prev.connected === next.connected
-      );
+        prev.messages === next.messages &&
+        prev.messageOrder === next.messageOrder &&
+        prev.connected === next.connected
+    );
 });
