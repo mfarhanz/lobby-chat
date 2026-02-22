@@ -3,7 +3,6 @@ import http from "http";
 import dotenv from "dotenv";
 import { logger } from "./logger";
 import { Server, Socket } from "socket.io";
-import { generateUsername } from "./username";
 import { UserMeta, MediaMeta } from "./types/meta";
 
 dotenv.config();
@@ -11,10 +10,10 @@ dotenv.config();
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET as string;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN as string;
 const PORT = Number(process.env.PORT) || 3000;
-const MAX_CONNECTIONS = 15000000;
+const MAX_CONNECTIONS = 3;  // max connections from one client
 const MAX_MESSAGE_LENGTH = 5000;
-const SPAM_THRESHOLD = 150000; // max messages
-const SPAM_TIME = 10000000000; // 10 seconds
+const SPAM_THRESHOLD = 8; // max messages within spam time
+const SPAM_TIME = 10000; // 10 seconds
 
 const app = express();
 // app.set("trust proxy", true);
@@ -23,8 +22,7 @@ const io = new Server(server, {
     // path: "/socket",
     transports: ["polling", "websocket"],
     cors: {
-        // origin: CLIENT_ORIGIN,
-        origin: "*",
+        origin: CLIENT_ORIGIN,
         methods: ["GET", "POST"],
     },
 });
@@ -43,24 +41,26 @@ process.on("unhandledRejection", (err: unknown) => {
 });
 
 chat.use(async (socket: Socket & { _ip?: string }, next) => {
-    // const ip =
-    //     (socket.handshake.headers["cf-connecting-ip"] as string) ||
-    //     (socket.handshake.headers["x-forwarded-for"] as string | undefined)
-    //         ?.split(",")[0] ||
-    //     socket.handshake.address;
-    // socket._ip = ip;
+    const ip =
+        (socket.handshake.headers["cf-connecting-ip"] as string) ||
+        (socket.handshake.headers["x-forwarded-for"] as string | undefined)
+            ?.split(",")[0] ||
+        socket.handshake.address;
+    socket._ip = ip;
 
-    // connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;     // temporary( no turnstile)
-    // if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
-    //     connectionsPerIp[ip]--;
-    //     return next(new Error("Too many connections from this IP"));
-    // }
-    return next();
+    connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;
+    if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
+        connectionsPerIp[ip]--;
+        return next(new Error("Too many connections from this IP"));
+    }
 
-    // const token = socket.handshake.auth?.turnstileToken as string | undefined;
-    // if (!token) {
-    //     return next(new Error("No Turnstile token provided"));
-    // }
+    const username = socket.handshake.auth.username;
+    if (!username || typeof username !== "string") return next(new Error("Username required"));
+    else socket.data.username = username;
+
+    const token = socket.handshake.auth?.turnstileToken as string | undefined;
+    if (!token) return next(new Error("No Turnstile token provided"));
+    return next();  // temporary for dev
 
     // try {
     //     let params = new URLSearchParams();
@@ -93,7 +93,7 @@ chat.use(async (socket: Socket & { _ip?: string }, next) => {
 
 chat.on("connection", (socket: Socket & { _ip?: string }) => {
     activeConnections++;
-    const username = generateUsername();
+    const username = socket.data.username;
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(socket.handshake.headers["user-agent"] || "");
 
     usersBySocketId[socket.id] = {

@@ -19,6 +19,7 @@ export default function App() {
         editMessage,
         deleteMessage,
         addReaction,
+        sendLocalSystemMessage,
     } = useChat();
 
     const [usersOpen, setUsersOpen] = useState(false);
@@ -68,6 +69,7 @@ export default function App() {
                     editMessage={editMessage}
                     deleteMessage={deleteMessage}
                     addReaction={addReaction}
+                    sendLocalMessage={sendLocalSystemMessage}
                 />
 
                 {usersOpen && (

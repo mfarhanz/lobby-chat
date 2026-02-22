@@ -23,6 +23,8 @@ import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
 import { usePaste } from "../hooks/usePaste";
 import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult } from "../types/chat";
+import { UsernameModal } from "./UsernameModal";
+import { LocalMessages } from "../data/localMessages";
 
 export interface ChatProps {
     username: string,
@@ -35,6 +37,7 @@ export interface ChatProps {
     editMessage: (messageId: string, text: string) => void;
     deleteMessage: (messageId: string) => void;
     addReaction: (messageId: string, emoji: string) => void;
+    sendLocalMessage: (text: string) => void;
 };
 
 // lazy load the EmojiPicker
@@ -51,6 +54,7 @@ export const Chat = memo(function Chat({
     editMessage,
     deleteMessage,
     addReaction,
+    sendLocalMessage,
 }: ChatProps) {
     const [input, setInput] = useState("");
     const [embed, setEmbed] = useState<string | null>(null);
@@ -58,6 +62,8 @@ export const Chat = memo(function Chat({
     const [copyId, setCopydId] = useState<string | null>(null);
     const [activeImage, setActiveImage] = useState<string | null>(null);
     const copyTimeoutRef = useRef<number | null>(null);
+    const [usernameSubmitted, setUsernameSubmitted] = useState(false);
+    const [pickedUsername, setPickedUsername] = useState<string | null>(null);
 
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [emojiPickerOpenId, setEmojiPickerOpenId] = useState<string | null>(null);
@@ -124,7 +130,12 @@ export const Chat = memo(function Chat({
     //     prevRef.current = deleteMessage;
     // });
 
-    useTurnstile(startChat);
+    useTurnstile(pickedUsername, startChat);
+
+    useEffect(() => {
+        if (!connected || !username) return;
+        sendLocalMessage(LocalMessages.welcome(username));
+    }, [connected, username, sendLocalMessage]);
 
     useEffect(() => {
         if (!embed) return;
@@ -375,6 +386,11 @@ export const Chat = memo(function Chat({
         setDrawerMessage(null);
     }, []);
 
+    const handleUsernameSubmit = useCallback((name: string | null) => {
+        setPickedUsername(name);
+        setUsernameSubmitted(true);
+    }, []);
+
     const onLongPress = useCallback((msg: MessageData) => {
         if (TOUCH_DEVICE) setDrawerMessage(msg);
     }, []);
@@ -497,10 +513,15 @@ export const Chat = memo(function Chat({
             onLongPressMessage: onLongPress,
         }
     }), [messages, messageOrder, username, today, copyId, emojiPickerOpenId, registerRef, scrollToMessage,
-         onCopyMessage, onReplyMessage, onEditMessage, onDeleteMessage, addReaction, handleImageError, onLongPress]);
+        onCopyMessage, onReplyMessage, onEditMessage, onDeleteMessage, addReaction, handleImageError, onLongPress]);
 
     return (
         <section className="chat-panel">
+            {/* Username selection modal */}
+            {!usernameSubmitted &&
+                <UsernameModal onSubmit={handleUsernameSubmit} />
+            }
+
             {/* Messages area/window */}
             <div
                 ref={messagesRef}

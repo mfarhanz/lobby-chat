@@ -78,12 +78,11 @@ const UserFormatMap: Record<number, (p: UserFormatMapParams) => string> = {
     28: ({ n, t, j }) => `${C(t!)}${C(n!)}${C(j!)}`,
     29: ({ adj, n, j }) => `${adj}${n}${L(j!)}`,
     30: ({ n, v }) => `${C(v!)}The${C(n!)}`,
-    31: ({ v, v2, x }) => `BORN2${v}FORCED2${v2}${x}`,
-    32: ({ n, pp, x }) => `my_${n}s_got_${pp}${x}`,
-    33: ({ n, adj, adv }) => `${adv}${adj}${n}`,
-    34: ({ n, adj, x }) => `${adj}${n}${x! % 100}`,
-    35: ({ n, adj, x }) => `${adj}_${n}${x}`,
-    36: ({ g, t, j }) => `${C(t!)}${C(j!)}Of${C(g!)}`,
+    31: ({ n, pp, x }) => `my_${n}s_got_${pp}${x}`,
+    32: ({ n, adj, adv }) => `${adv}${adj}${n}`,
+    33: ({ n, adj, x }) => `${adj}${n}${x! % 100}`,
+    34: ({ n, adj, x }) => `${adj}_${n}${x}`,
+    35: ({ g, t, j }) => `${C(t!)}${C(j!)}Of${C(g!)}`,
 };
 
 export function generateUsername(): string {
@@ -117,4 +116,8 @@ export function generateUsername(): string {
         x: number,
     });
 
+}
+
+export function generateUsernameSet(count = 5) {
+  return Array.from({ length: count }, generateUsername);
 }

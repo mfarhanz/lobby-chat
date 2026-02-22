@@ -173,7 +173,8 @@ body {
   /* .chat-message-self {} */
 
   .chat-message-text-wrapper {
-    @apply flex flex-wrap items-baseline gap-x-4 gap-y-1;
+    /* @apply flex flex-wrap items-baseline gap-x-4 gap-y-1; */
+    @apply block;
   }
 
   .chat-message-header {
@@ -229,6 +230,7 @@ body {
 
   /* Markdown styles scoped to chat messages */
   .chat-message-text p {
+    @apply mb-1;
     white-space: pre-wrap;
     /* preserves newlines and returns in text */
   }
@@ -238,11 +240,11 @@ body {
   } */
 
   .chat-message-text h1 {
-    @apply text-2xl font-bold mt-2 mb-1;
+    @apply text-2xl font-bold mt-4 mb-1;
   }
 
   .chat-message-text h2 {
-    @apply text-xl font-semibold mt-2 mb-1;
+    @apply text-xl font-semibold mt-3 mb-1;
   }
 
   .chat-message-text h3 {
@@ -250,12 +252,12 @@ body {
   }
 
   .chat-message-text blockquote {
-    @apply border-l-3 border-zinc-500 pl-4 italic text-zinc-300;
+    @apply border-l-3 border-zinc-500 pl-4 mb-3 italic text-zinc-300;
   }
 
   .chat-message-text ul,
   .chat-message-text ol {
-    @apply ml-5 my-2 list-disc;
+    @apply ml-5 mb-4 list-disc;
   }
 
   .chat-message-text ol {
@@ -407,5 +409,21 @@ body {
 
   .group:hover .status-tooltip {
     opacity: 1;
+  }
+
+  @keyframes text-slide {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0%);
+      opacity: 1;
+    }
+  }
+
+  .animate-text-slide {
+    animation: text-slide 0.2s ease-out;
   }
 }

@@ -3,6 +3,7 @@ import { io, Socket } from "socket.io-client";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
 import type { MessageData, UserMeta, SendPayload, SessionUserStatsMeta } from "../types/chat";
 import { MAX_MESSAGE_REACTIONS } from "../constants/chat";
+import { LocalMessages } from "../data/localMessages";
 
 export function useChat() {
     const [messages, setMessages] = useState<Map<string, MessageData>>(new Map());
@@ -17,19 +18,32 @@ export function useChat() {
         ClientToServerEvents
     > | null>(null);
 
-    const startChat = useCallback((turnstileToken?: string) => {
+    const startChat = useCallback((username?: string, turnstileToken?: string) => {
         if (socket) return;
 
-        const newSocket = io(
-            import.meta.env.VITE_SOCKET_URL + "/chat",
-            // {
-            //     path: "/socket",
-            //     auth: turnstileToken ? { turnstileToken } : {},
-            // }
-        );
+        const newSocket = io(import.meta.env.VITE_SOCKET_URL + "/chat", {
+            // path: "/socket",
+            auth: { username, turnstileToken }
+        });
 
         setSocket(newSocket);
     }, [socket]);
+
+    const sendLocalSystemMessage = useCallback((text: string) => {
+        const id = `__local_${crypto.randomUUID()}`;
+
+        setMessages(prev => {
+            const newMap = new Map(prev);
+            newMap.set(id, {
+                id,
+                user: "System",
+                text,
+                timestamp: Date.now(),
+            });
+            return newMap;
+        });
+        setMessageOrder(prev => [...prev, id]);
+    }, []);
 
     const sendMessage = useCallback((payload: SendPayload) => {
         const hasText = payload.text.trim().length > 0;
@@ -49,7 +63,6 @@ export function useChat() {
     const addReaction = useCallback((messageId: string, emoji: string) => {
         socket?.emit("add-reaction", { messageId, emoji });
     }, [socket]);
-
 
     useEffect(() => {
         if (!socket) return;
@@ -186,12 +199,17 @@ export function useChat() {
             setUsers(users);
         });
         socket.on("kicked", (reason) => {
-            alert(reason || "You have been kicked!");
+            sendLocalSystemMessage(LocalMessages.kicked(reason ?? null));
             socket.disconnect();
         });
         socket.on("disconnect", () => {
+            sendLocalSystemMessage(LocalMessages.disconnected());
             setUsers([]);
             setConnected(false);
+        });
+        socket.on("connect_error", (err) => {
+            sendLocalSystemMessage(LocalMessages.connection_error(err.message));
+            console.error("Connection failed: ", err.message);
         });
 
         return () => {
@@ -203,6 +221,7 @@ export function useChat() {
             socket.off("kicked");
             socket.off("connect");
             socket.off("disconnect");
+            socket.off("connect_error");
         };
     }, [socket]);
 
@@ -225,5 +244,6 @@ export function useChat() {
         editMessage,
         deleteMessage,
         addReaction,
+        sendLocalSystemMessage,
     };
 }

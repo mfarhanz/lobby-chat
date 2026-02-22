@@ -1,13 +1,13 @@
 import { useEffect, useRef } from "react";
 
-export function useTurnstile(startChat: (token?: string) => void) {
+export function useTurnstile(username: string | null, startChat: (username?: string, token?: string) => void) {
   const rendered = useRef(false);
 
   useEffect(() => {
-    if (rendered.current) return;
+    if (!username || rendered.current) return;
     rendered.current = true;
 
-    startChat();   // temporary, just for dev
+    startChat(username, "dawdwd");   // temporary, just for dev
 
     // // @ts-expect-error injected by CF script
     // window.turnstile.render("#turnstile-container", {
@@ -19,11 +19,11 @@ export function useTurnstile(startChat: (token?: string) => void) {
     //       document.getElementById("turnstile-overlay")?.remove();
     //     }, 1000);
 
-    //     startChat(token);
+    //     startChat(username, token);
     //   },
     //   "error-callback": (err: unknown) => {
     //     console.error("Turnstile error:", err);
     //   },
     // });
-  }, [startChat]);
+  }, [startChat, username]);
 }
