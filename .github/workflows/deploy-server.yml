@@ -32,8 +32,8 @@ jobs:
             echo "🔹 Installing dependencies"
             npm install
 
-            echo "🔹 Building TypeScript into dist/"
-            npm run build
+            echo "🔹 Skipping TypeScript build (dist/ already exists)"
+            echo "   Make sure you built locally and committed dist/"
 
             echo "🔹 Restarting PM2 process (or starting if not running)"
             pm2 restart lobby-chat || pm2 start dist/index.js --name lobby-chat
@@ -41,4 +41,4 @@ jobs:
             echo "🔹 Saving PM2 process list"
             pm2 save
 
-            echo "Deployment completed"
+            echo "✅ Deployment completed"

@@ -6,6 +6,9 @@ dist/
 build/
 dist-ssr/
 
+# allow tracking
+!server/dist/
+
 # env files
 .env
 .env.*
