@@ -1,0 +1,44 @@
+name: Redeploy Lobby-Chat Server
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            echo "🔹 Going to repo root ~/lobby-chat"
+            cd ~/lobby-chat
+
+            echo "🔹 Pulling latest code from GitHub"
+            git pull origin main
+
+            echo "🔹 Changing to server folder"
+            cd server
+
+            echo "🔹 Installing dependencies"
+            npm install
+
+            echo "🔹 Building TypeScript into dist/"
+            npm run build
+
+            echo "🔹 Restarting PM2 process (or starting if not running)"
+            pm2 restart lobby-chat || pm2 start dist/index.js --name lobby-chat
+
+            echo "🔹 Saving PM2 process list"
+            pm2 save
+
+            echo "Deployment completed"
