@@ -12,7 +12,7 @@ import { useLongPress } from "../hooks/useLongPress";
 import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
 import type { DOMEvent, MessageData } from "../types/chat";
-import { lazy, memo, Suspense, useCallback, useEffect, useMemo } from "react";
+import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 
 interface ChatMessageProps extends DOMEvent {
     msg: MessageData;
