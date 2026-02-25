@@ -2,7 +2,7 @@ import "./App.css";
 import { useEffect, useMemo, useState } from "react";
 import { Chat } from "./components/Chat";
 import { UsersPanel } from "./components/UsersPanel";
-// import { TurnstileOverlay } from "./components/TurnstileOverlay";
+import { TurnstileOverlay } from "./components/TurnstileOverlay";
 import { useChat } from "./hooks/useChat";
 
 export default function App() {
@@ -48,7 +48,7 @@ export default function App() {
 
     return (
         <div className="app-shell">
-            {/* <TurnstileOverlay /> */}
+            <TurnstileOverlay />
 
             <header
                 className="app-header text-title"

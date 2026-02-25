@@ -22,7 +22,7 @@ export const UsersPanel = memo(function UsersPanel({
     const [activeUser, setActiveUser] = useState<{ username: string; joinedAt: number; } | null>(null);
     const [now, setNow] = useState<number>(() => Date.now());
 
-    // console.log("Userpanel render");
+    // console.log("Userpanel render"); // testing - this prints whenever panel re-renders
 
     function formatRelativeTime(timestamp: number, now: number): string {
         const diff = now - timestamp;

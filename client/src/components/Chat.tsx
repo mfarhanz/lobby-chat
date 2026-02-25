@@ -63,7 +63,6 @@ export const Chat = memo(function Chat({
     const [activeImage, setActiveImage] = useState<string | null>(null);
     const copyTimeoutRef = useRef<number | null>(null);
     const [usernameSubmitted, setUsernameSubmitted] = useState(false);
-    const [pickedUsername, setPickedUsername] = useState<string | null>(null);
 
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [emojiPickerOpenId, setEmojiPickerOpenId] = useState<string | null>(null);
@@ -130,7 +129,8 @@ export const Chat = memo(function Chat({
     //     prevRef.current = deleteMessage;
     // });
 
-    useTurnstile(pickedUsername, startChat);
+    // useTurnstile(pickedUsername, startChat);
+    const { submitUsername } = useTurnstile(startChat);
 
     useEffect(() => {
         if (!connected || !username) return;
@@ -387,9 +387,9 @@ export const Chat = memo(function Chat({
     }, []);
 
     const handleUsernameSubmit = useCallback((name: string | null) => {
-        setPickedUsername(name);
+        submitUsername(name); 
         setUsernameSubmitted(true);
-    }, []);
+    }, [submitUsername]);
 
     const onLongPress = useCallback((msg: MessageData) => {
         if (TOUCH_DEVICE) setDrawerMessage(msg);

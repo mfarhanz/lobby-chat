@@ -47,11 +47,6 @@ chat.use(async (socket, next) => {
             ?.split(",")[0] ||
         socket.handshake.address;
     socket._ip = ip;
-    connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;
-    if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
-        connectionsPerIp[ip]--;
-        return next(new Error("Too many connections from this IP"));
-    }
     const username = socket.handshake.auth.username;
     if (!username || typeof username !== "string")
         return next(new Error("Username required"));
@@ -60,29 +55,30 @@ chat.use(async (socket, next) => {
     const token = socket.handshake.auth?.turnstileToken;
     if (!token)
         return next(new Error("No Turnstile token provided"));
-    return next(); // temporary for dev
-    // try {
-    //     let params = new URLSearchParams();
-    //     params.append('secret', TURNSTILE_SECRET);
-    //     params.append('response', token);
-    //     const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    //         body: params,
-    //         method: "POST",
-    //     });
-    //     const data: { success?: boolean } = await res.json();
-    //     if (!data.success) {
-    //         return next(new Error("Turnstile validation failed"));
-    //     }
-    //     // Increment ONLY after validation passes
-    //     connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;
-    //     if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
-    //         connectionsPerIp[ip]--;
-    //         return next(new Error("Too many connections from this IP"));
-    //     }
-    //     next();
-    // } catch (err) {
-    //     return next(new Error("Turnstile validation error"));
-    // }
+    // return next();  // temporary for dev
+    try {
+        let params = new URLSearchParams();
+        params.append('secret', TURNSTILE_SECRET);
+        params.append('response', token);
+        const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            body: params,
+            method: "POST",
+        });
+        const data = await res.json();
+        if (!data.success) {
+            return next(new Error("Turnstile validation failed"));
+        }
+        // Increment ONLY after validation passes
+        connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;
+        if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
+            connectionsPerIp[ip]--;
+            return next(new Error("Too many connections from this IP"));
+        }
+        next();
+    }
+    catch (err) {
+        return next(new Error("Turnstile validation error"));
+    }
 });
 chat.on("connection", (socket) => {
     activeConnections++;

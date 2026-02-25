@@ -23,7 +23,7 @@ export function useChat() {
 
         const newSocket = io(import.meta.env.VITE_SOCKET_URL + "/chat", {
             // path: "/socket",
-            auth: { username, turnstileToken }
+            auth: { username, turnstileToken: turnstileToken }
         });
 
         setSocket(newSocket);

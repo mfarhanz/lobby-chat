@@ -36,7 +36,7 @@ export async function fakeUploadFiles(
             id,
             key,
             url: `https://fake-cdn.local/${key}`,
-            // url: "https://savethefrogs.com/wp-content/uploads/placeholder-image-blue-landscape.png",
+            // url: "https://savethefrogs.com/wp-content/uploads/placeholder-image-blue-landscape.png", // testing
             mime: file.type,
             size: file.size,
         };

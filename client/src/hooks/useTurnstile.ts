@@ -1,29 +1,48 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useTurnstile(username: string | null, startChat: (username?: string, token?: string) => void) {
-  const rendered = useRef(false);
+export function useTurnstile(startChat: (username?: string, token?: string) => void) {
+    const rendered = useRef(false);
+    const [token, setToken] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!username || rendered.current) return;
-    rendered.current = true;
+    // render turnstile once, immediately
+    useEffect(() => {
+        if (rendered.current) return;
+        rendered.current = true;
 
-    startChat(username, "dawdwd");   // testing - skip turnstile when in dev
+        const renderWidget = () => {
+            // @ts-expect-error injected by CF script
+            window.turnstile.render("#turnstile-container", {
+                sitekey: "0x4AAAAAACJ_0HK2dEtgp0S_",
+                size: "normal",
+                theme: "light",
+                callback: (t: string) => {
+                    console.log("Turnstile passed:", t);
+                    setTimeout(() => {
+                        document.getElementById("turnstile-overlay")?.remove();
+                    }, 1000);
 
-    // // @ts-expect-error injected by CF script
-    // window.turnstile.render("#turnstile-container", {
-    //   sitekey: "0x4AAAAAACJ_0HK2dEtgp0S_",
-    //   size: "normal",
-    //   theme: "light",
-    //   callback: (token: string) => {
-    //     setTimeout(() => {
-    //       document.getElementById("turnstile-overlay")?.remove();
-    //     }, 1000);
+                    setToken(t);
+                },
+                "error-callback": (err: unknown) => {
+                    console.error("Turnstile error:", err);
+                },
+            });
+        };
 
-    //     startChat(username, token);
-    //   },
-    //   "error-callback": (err: unknown) => {
-    //     console.error("Turnstile error:", err);
-    //   },
-    // });
-  }, [startChat, username]);
+        renderWidget();
+    }, []);
+
+    // function to submit username once token exists and saved
+    const submitUsername = useCallback(
+        (username: string | null) => {
+            if (!token) {
+                alert("Please complete the verification first!");
+                return;
+            }
+            startChat(username ?? undefined, token);
+        },
+        [token, startChat]
+    );
+
+    return { submitUsername, token };
 }
