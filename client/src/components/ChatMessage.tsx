@@ -55,7 +55,7 @@ export const ChatMessage = memo(function ChatMessage({
     onLongPressMessage
 }: ChatMessageProps) {
 
-    // useEffect(() => {
+    // useEffect(() => {        // testing - this will print whenever this message is rendered
     //     console.log("Rendered", msg.id);
     // });
 

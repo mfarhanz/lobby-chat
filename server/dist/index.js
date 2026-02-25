@@ -9,21 +9,25 @@ const dotenv_1 = __importDefault(require("dotenv"));
 const logger_1 = require("./logger");
 const socket_io_1 = require("socket.io");
 dotenv_1.default.config();
+const allowedOrigins = [
+    "http://localhost:5173", // local vite dev frontend
+    "https://lobbychat.pages.dev", // Cloudflare Pages deployed client
+    "https://chat.mfarhanz.dev", // additional subdomain of mine
+];
 const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN;
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_CONNECTIONS = 3; // max connections from one client
 const MAX_MESSAGE_LENGTH = 5000;
 const SPAM_THRESHOLD = 8; // max messages within spam time
 const SPAM_TIME = 10000; // 10 seconds
 const app = (0, express_1.default)();
-// app.set("trust proxy", true);
+app.set("trust proxy", true);
 const server = http_1.default.createServer(app);
 const io = new socket_io_1.Server(server, {
     // path: "/socket",
     transports: ["polling", "websocket"],
     cors: {
-        origin: CLIENT_ORIGIN,
+        origin: allowedOrigins,
         methods: ["GET", "POST"],
     },
 });

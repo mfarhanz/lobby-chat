@@ -121,7 +121,7 @@ export const Chat = memo(function Chat({
         setAction,
     });
 
-    // console.log("Chat render");
+    // console.log("Chat render");  // testing - this will print whenever chat re-renders
     // const prevRef = useRef<unknown>(null);
     // useEffect(() => {
     //     if (prevRef.current && prevRef.current !== deleteMessage) {

@@ -7,7 +7,7 @@ export function useTurnstile(username: string | null, startChat: (username?: str
     if (!username || rendered.current) return;
     rendered.current = true;
 
-    startChat(username, "dawdwd");   // temporary, just for dev
+    startChat(username, "dawdwd");   // testing - skip turnstile when in dev
 
     // // @ts-expect-error injected by CF script
     // window.turnstile.render("#turnstile-container", {
