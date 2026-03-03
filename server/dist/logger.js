@@ -18,7 +18,12 @@ const dailyRotate = new winston_daily_rotate_file_1.default({
 });
 exports.logger = winston_1.default.createLogger({
     level: "info",
-    format: winston_1.default.format.combine(winston_1.default.format.timestamp(), winston_1.default.format.printf(({ timestamp, level, message }) => `${timestamp} [${level.toUpperCase()}] ${message}`)),
+    format: winston_1.default.format.combine(winston_1.default.format.timestamp({
+        format: () => new Date().toLocaleTimeString("en-GB", {
+            timeZone: "America/Toronto",
+            hour12: false
+        })
+    }), winston_1.default.format.printf(({ timestamp, level, message }) => `${timestamp} [${level.toUpperCase()}] ${message}`)),
     transports: [
         dailyRotate,
     ],

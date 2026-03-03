@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import type { MessageActionData, FileData, SendPayload } from "../types/chat";
 import { fakeUploadFiles } from "../utils/media";
 
@@ -25,7 +26,7 @@ export function useChatSend({
     setAction,
 }: UseChatSendProps) {
 
-    const handleSend = async () => {
+    const handleSend = useCallback(async () => {
         const hasText = !!input.trim();
         const hasValidEmbed = !!embed;
         const hasUploads = uploadsRef.current.length > 0;
@@ -71,7 +72,15 @@ export function useChatSend({
         setInput("");
         setAction(null);
         uploadsRef.current = [];
-    };
+    }, [sendMessage,
+        editMessage,
+        cleanupPreviewUrls,
+        uploadsRef,
+        embed,
+        input,
+        setInput,
+        action,
+        setAction,]);
 
     return { handleSend };
 }

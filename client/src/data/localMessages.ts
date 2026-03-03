@@ -21,7 +21,11 @@ Need help or want to contact the administrator? [Reach out here](https://mfarhan
 
 Have fun! 😄
 `,
-    kicked: (reason: string | null) => `You were kicked: **${reason ?? "~~no reason really lol~~"}**`,
-    disconnected: () => `You have been disconnected.`,
+    kicked: (reason: string | null) => `You were kicked: **${reason ?? "No reason provided"}**`,
+    kick_warning: () => "_You're sending messages too quickly! Please wait a moment before sending another message to avoid being kicked._",
+    disconnected: () => "You have been disconnected.",
     connection_error: (error: string) => `Error connecting to chat: **${error}**`,
+    image_limit: () => "_You have reached the daily limit for sending media files. You can still send text messages._",
+    server_limit: (downtime: number) => `_The chat server has reached its daily message limit. 
+            To conserve costs, the chat is temporarily unavailable until the server comes back online in ${downtime} hour${downtime !== 1 ? "s" : ""}._`
 }

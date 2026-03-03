@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export function useTurnstile(startChat: (username?: string, token?: string) => void) {
     const rendered = useRef(false);
     const [token, setToken] = useState<string | null>(null);
+    // console.log("useturnstile");
 
     // render turnstile once, immediately
     useEffect(() => {
@@ -11,22 +12,27 @@ export function useTurnstile(startChat: (username?: string, token?: string) => v
 
         const renderWidget = () => {
             // @ts-expect-error injected by CF script
-            window.turnstile.render("#turnstile-container", {
-                sitekey: "0x4AAAAAACJ_0HK2dEtgp0S_",
-                size: "normal",
-                theme: "light",
-                callback: (t: string) => {
-                    console.log("Turnstile passed:", t);
-                    setTimeout(() => {
-                        document.getElementById("turnstile-overlay")?.remove();
-                    }, 1000);
+            if (window.turnstile) {
+                // @ts-expect-error injected by CF script
+                window.turnstile.render("#turnstile-container", {
+                    sitekey: "0x4AAAAAACJ_0HK2dEtgp0S_",
+                    size: "normal",
+                    theme: "light",
+                    callback: (t: string) => {
+                        console.log("Turnstile passed:", t);
+                        setTimeout(() => {
+                            document.getElementById("turnstile-overlay")?.remove();
+                        }, 1000);
 
-                    setToken(t);
-                },
-                "error-callback": (err: unknown) => {
-                    console.error("Turnstile error:", err);
-                },
-            });
+                        setToken(t);
+                    },
+                    "error-callback": (err: unknown) => {
+                        console.error("Turnstile error:", err);
+                    },
+                });
+            } else {
+                setTimeout(renderWidget, 50);   // in case turn turnstile script hasn't loaded yet
+            }
         };
 
         renderWidget();

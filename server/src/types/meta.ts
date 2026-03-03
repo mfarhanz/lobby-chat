@@ -1,14 +1,21 @@
+export type UserMeta = {
+  username: string;
+  messages: MessageMeta[];
+  joinedAt: number;
+  messagesToday: number;
+  imagesToday: number;
+  recentSends: number[];
+  device: string;
+};
+
+export type IpMeta = {
+    connections: number;
+    blocked: boolean;
+};
+
 export type MessageMeta = {
   id: string;
   createdAt: number;
-};
-
-export type UserMeta = {
-  username: string;
-  recentSends: number[];
-  messages: MessageMeta[];
-  joinedAt: number;
-  device: string;
 };
 
 export type MediaMeta = {

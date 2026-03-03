@@ -25,6 +25,7 @@ import { usePaste } from "../hooks/usePaste";
 import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult } from "../types/chat";
 import { UsernameModal } from "./UsernameModal";
 import { LocalMessages } from "../data/localMessages";
+import { useInactivityCheck } from "../hooks/useInactivityCheck";
 
 export interface ChatProps {
     username: string,
@@ -38,6 +39,7 @@ export interface ChatProps {
     deleteMessage: (messageId: string) => void;
     addReaction: (messageId: string, emoji: string) => void;
     sendLocalMessage: (text: string) => void;
+    disconnectInactiveClient: () => void;
 };
 
 // lazy load the EmojiPicker
@@ -55,6 +57,7 @@ export const Chat = memo(function Chat({
     deleteMessage,
     addReaction,
     sendLocalMessage,
+    disconnectInactiveClient,
 }: ChatProps) {
     const [input, setInput] = useState("");
     const [embed, setEmbed] = useState<string | null>(null);
@@ -120,17 +123,13 @@ export const Chat = memo(function Chat({
         setAction,
     });
 
-    // console.log("Chat render");  // testing - this will print whenever chat re-renders
-    // const prevRef = useRef<unknown>(null);
-    // useEffect(() => {
-    //     if (prevRef.current && prevRef.current !== deleteMessage) {
-    //         console.log("deleteMessage CHANGED reference!");
-    //     }
-    //     prevRef.current = deleteMessage;
-    // });
-
-    // useTurnstile(pickedUsername, startChat);
     const { submitUsername } = useTurnstile(startChat);
+
+    useInactivityCheck({
+        connected,
+        onDisconnect: disconnectInactiveClient,
+        sendLocalSystemMessage: sendLocalMessage
+    });
 
     useEffect(() => {
         if (!connected || !username) return;
@@ -202,7 +201,7 @@ export const Chat = memo(function Chat({
     //     });
     // }, []);
 
-    const getSize = useCallback((index: number) => {
+    const getWindowItemSize = useCallback((index: number) => {
         const id = messageOrder[index];
         return sizeMap.current.get(id) ?? 83; // TODO: change hardcoded value later
     }, [messageOrder]);
@@ -272,42 +271,40 @@ export const Chat = memo(function Chat({
         if (textareaRef.current) textareaRef.current.style.height = "auto";
     }, [handleSend, setEmbed, setUploads]);
 
-    const { handlePaste } = usePaste({
-        callback: (result: PasteResult) => {
-            if (result) {
-                switch (result.type) {
-                    case "image":
-                        if (result.file) {          // if its a local file on device that was pasted
-                            setUploads(prev => {
-                                const combined: FileData[] = [
-                                    ...prev,
-                                    ...(result.file ? [{ file: result.file, url: result.url }] : [])
-                                ];
-                                return combined.slice(0, 4);
-                            });
-                        } else setEmbed(result.url);
-                        break;
-                    case "youtube":
-                        console.log("youtube URL detected:", result);
-                        break;
-                    case "spotify":
-                        console.log("spotify URL detected:", result);
-                        break;
-                    case "twitter":
-                        console.log("twitter URL detected:", result);
-                        break;
-                    case "github":
-                        console.log("github URL detected:", result);
-                        break;
-                    default:
-                        console.log("Error pasting content: ", result);
-                }
-            }
-            else {
-                console.log("Normal text pasted", result);
+    const pasteCallback = useCallback((result: PasteResult) => {
+        if (result) {
+            switch (result.type) {
+                case "image":
+                    if (result.file) {          // if its a local file on device that was pasted
+                        setUploads(prev => {
+                            const combined: FileData[] = [
+                                ...prev,
+                                ...(result.file ? [{ file: result.file, url: result.url }] : [])
+                            ];
+                            return combined.slice(0, 4);
+                        });
+                    } else setEmbed(result.url);
+                    break;
+                case "youtube":
+                    console.log("youtube URL detected:", result);
+                    break;
+                case "spotify":
+                    console.log("spotify URL detected:", result);
+                    break;
+                case "twitter":
+                    console.log("twitter URL detected:", result);
+                    break;
+                case "github":
+                    console.log("github URL detected:", result);
+                    break;
+                default:
+                    console.log("Error pasting content: ", result);
             }
         }
-    });
+        else {
+            console.log("Normal text pasted", result);
+        }
+    }, [setUploads, setEmbed]);
 
     // throttled onScroll internal handler
     const handleScroll = useCallback((scrollOffset: number) => {
@@ -363,6 +360,8 @@ export const Chat = memo(function Chat({
         }
     }, []);
 
+    const { handlePaste } = usePaste({ callback: pasteCallback });
+
     const handleEmojiInputSelect = useCallback((emoji: string) => {
         setInput((v) => v + emoji);
     }, []);
@@ -387,7 +386,7 @@ export const Chat = memo(function Chat({
     }, []);
 
     const handleUsernameSubmit = useCallback((name: string | null) => {
-        submitUsername(name); 
+        submitUsername(name);
         setUsernameSubmitted(true);
     }, [submitUsername]);
 
@@ -515,6 +514,20 @@ export const Chat = memo(function Chat({
     }), [messages, messageOrder, username, today, copyId, emojiPickerOpenId, registerRef, scrollToMessage,
         onCopyMessage, onReplyMessage, onEditMessage, onDeleteMessage, addReaction, handleImageError, onLongPress]);
 
+
+    ///////////////////////////////////////////TESTING///////////////////////////////////////////////////////////////////
+    // console.log("Chat render");  // testing - this will print whenever chat re-renders
+    const prevRef = useRef<unknown>(null);
+    useEffect(() => {   // runs whenever chat rerenders
+        if (prevRef.current === null) {
+            console.log("First render");        // if this prints, object is still the same as original in memory
+        } else if (prevRef.current !== rowRefs) {
+            console.log("Reference changed!");      // if this prints, object recreated anew every time in memory
+        }
+        prevRef.current = rowRefs;       // if nothing prints, object is unchanged since initial creation
+    });
+    /////////////////////////////////////////////TESTING/////////////////////////////////////////////////////////////////
+
     return (
         <section className="chat-panel">
             {/* Username selection modal */}
@@ -535,7 +548,7 @@ export const Chat = memo(function Chat({
                         width="100%"
                         className="scrollbar-custom"
                         itemCount={messageOrder.length}
-                        itemSize={getSize}
+                        itemSize={getWindowItemSize}
                         itemData={itemData}
                         overscanCount={1}
                         onScroll={({ scrollOffset }) => handleScroll(scrollOffset)}

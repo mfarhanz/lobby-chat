@@ -16,7 +16,13 @@ const dailyRotate = new DailyRotateFile({
 export const logger = winston.createLogger({
     level: "info",
     format: winston.format.combine(
-        winston.format.timestamp(),
+        winston.format.timestamp({
+            format: () =>
+                new Date().toLocaleTimeString("en-GB", {
+                    timeZone: "America/Toronto",
+                    hour12: false
+                })
+        }),
         winston.format.printf(
             ({ timestamp, level, message }) =>
                 `${timestamp} [${level.toUpperCase()}] ${message}`

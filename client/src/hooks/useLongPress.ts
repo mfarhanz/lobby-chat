@@ -12,6 +12,8 @@ export function useLongPress({
 }: UseLongPressProps) {
     const timerRef = useRef<number | null>(null);
 
+    // console.log("longpress");
+
     const start = useCallback(() => {
         if (!TOUCH_DEVICE) return;
 

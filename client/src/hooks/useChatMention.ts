@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { autoResize } from "../utils/textarea";
 
 interface UseChatMentionProps {
@@ -13,7 +13,7 @@ export function useChatMention({ users, input, setInput, textareaRef }: UseChatM
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(0);
 
-    const selectSuggestion = (username: string) => {
+    const selectSuggestion = useCallback((username: string) => {
         if (!textareaRef.current) return;
 
         const textarea = textareaRef.current;
@@ -35,9 +35,9 @@ export function useChatMention({ users, input, setInput, textareaRef }: UseChatM
 
         setShowSuggestions(false);
         setSuggestions([]);
-    };
+    }, [input, textareaRef, setInput, setSuggestions, setShowSuggestions]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const handleInputChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const value = e.target.value;
         setInput(value);
         autoResize(e);
@@ -56,9 +56,9 @@ export function useChatMention({ users, input, setInput, textareaRef }: UseChatM
             setShowSuggestions(false);
             setSuggestions([]);
         }
-    };
+    }, [users, setInput, setSuggestions, setShowSuggestions, setHighlightedIndex]);
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>, onSubmit: () => void) => {
+    const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>, onSubmit: () => void) => {
         if (showSuggestions && suggestions.length > 0) {
             if (e.key === "ArrowDown") {
                 e.preventDefault();
@@ -74,7 +74,7 @@ export function useChatMention({ users, input, setInput, textareaRef }: UseChatM
             e.preventDefault();
             onSubmit();
         }
-    };
+    }, [suggestions, selectSuggestion, showSuggestions, highlightedIndex, setHighlightedIndex]);
 
     return {
         suggestions,

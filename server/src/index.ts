@@ -1,24 +1,17 @@
 import express from "express";
 import http from "http";
-import dotenv from "dotenv";
 import { logger } from "./logger";
 import { Server, Socket } from "socket.io";
-import { UserMeta, MediaMeta } from "./types/meta";
-
-dotenv.config();
+import { UserMeta, MediaMeta, IpMeta } from "./types/meta";
+import { SERVER_MESSAGES as SV } from "./constants";
+import * as CFG from "./config";
 
 const allowedOrigins = [
-  "http://localhost:5173",           // local vite dev frontend
-  "https://lobbychat.pages.dev",     // Cloudflare Pages deployed client
-  "https://chat.mfarhanz.dev",       // additional subdomain of mine
+    "http://localhost:4173",            // local vite prod frontend
+    "http://localhost:5173",           // local vite dev frontend
+    "https://lobbychat.pages.dev",     // Cloudflare Pages deployed client
+    "https://chat.mfarhanz.dev",       // additional subdomain of mine
 ];
-
-const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET as string;
-const PORT = Number(process.env.PORT) || 3000;
-const MAX_CONNECTIONS = 3;  // max connections from one client
-const MAX_MESSAGE_LENGTH = 5000;
-const SPAM_THRESHOLD = 8; // max messages within spam time
-const SPAM_TIME = 10000; // 10 seconds
 
 const app = express();
 app.set("trust proxy", true);
@@ -32,17 +25,21 @@ const io = new Server(server, {
     },
 });
 
-const connectionsPerIp: Record<string, number> = {};
+const ipCache: Record<string, IpMeta> = {};
 const usersBySocketId: Record<string, UserMeta> = {};
 const chat = io.of("/chat");
+
 let activeConnections = 0;
+let totalMessagesToday = 0;
 
 process.on("uncaughtException", (err: unknown) => {
-    logger.error(`Internal Server Error: ${err}`);
+    logger.error(`${SV.SERVER_ERROR}: ${err}`);
+    shutdown();
 });
 
 process.on("unhandledRejection", (err: unknown) => {
-    logger.error(`Internal Server Error: ${err}`);
+    logger.error(`${SV.SERVER_ERROR}: ${err}`);
+    shutdown();
 });
 
 chat.use(async (socket: Socket & { _ip?: string }, next) => {
@@ -58,13 +55,13 @@ chat.use(async (socket: Socket & { _ip?: string }, next) => {
     else socket.data.username = username;
 
     const token = socket.handshake.auth?.turnstileToken as string | undefined;
-    if (!token) return next(new Error("No Turnstile token provided"));
-    
+    if (!token) return next(new Error(`${SV.CF_MISSING}: ${SV.CLIENT_UNEXPECTED}`)); // fail fast if token not present
+
     // return next();  // temporary for dev
 
     try {
         let params = new URLSearchParams();
-        params.append('secret', TURNSTILE_SECRET);
+        params.append('secret', CFG.TURNSTILE_SECRET);
         params.append('response', token);
 
         const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
@@ -72,22 +69,48 @@ chat.use(async (socket: Socket & { _ip?: string }, next) => {
             method: "POST",
         });
 
-        const data: { success?: boolean } = await res.json();
-
+        const data: { success?: boolean; "error-codes"?: string[] } = await res.json();
         if (!data.success) {
-            return next(new Error("Turnstile validation failed"));
+            let msg = `${SV.CF_FAILED}`;
+            if (data["error-codes"]?.includes("timeout-or-duplicate")) {
+                msg = `${SV.CF_EXPIRED}: ${SV.CLIENT_RELOAD}.`;
+            } else if (data["error-codes"]?.includes("invalid-input-response")) {
+                msg = `${SV.CF_INVALID}: ${SV.CLIENT_RELOAD}.`;
+            } else if (data["error-codes"]?.includes("missing-input-response")) {
+                msg = `${SV.CF_MISSING}: ${SV.CLIENT_UNEXPECTED}.`;
+            } else if (data["error-codes"]?.includes("bad-request")) {
+                msg = `${SV.CF_BAD_REQUEST}: ${SV.CLIENT_RELOAD}.`;
+            } else if (data["error-codes"]?.includes("internal-error")) {
+                msg = `${SV.CF_ERROR}: ${SV.CLIENT_RELOAD_LATER}.`;
+            }
+            return next(new Error(msg));
         }
 
-        // Increment ONLY after validation passes
-        connectionsPerIp[ip] = (connectionsPerIp[ip] || 0) + 1;
-        if (connectionsPerIp[ip] > MAX_CONNECTIONS) {
-            connectionsPerIp[ip]--;
-            return next(new Error("Too many connections from this IP"));
+        if (activeConnections >= CFG.MAX_CONNECTIONS) {
+            return next(new Error(`${SV.SERVER_FULL} ${SV.CLIENT_DISMISS}`));
+        }
+
+        // Check IP and increment ONLY after validation passes
+        if (!ipCache[ip]) {
+            ipCache[ip] = {
+                connections: 0,
+                blocked: false,
+            };
+        }
+        ipCache[ip].connections++;
+        if (ipCache[ip].blocked) {
+            const hoursLeft = hoursUntilReset();
+            return next(new Error(`${SV.USER_MESSAGE_LIMIT} 
+                        You can send messages again in ${hoursLeft} hour${hoursLeft !== 1 ? "s" : ""}.`));
+        }
+        if (ipCache[ip].connections > CFG.MAX_CONNECTIONS_FROM_IP) {
+            ipCache[ip].connections--;
+            return next(new Error(`${SV.USER_IP_LIMIT}`));
         }
 
         next();
     } catch (err) {
-        return next(new Error("Turnstile validation error"));
+        return next(new Error(`${SV.CF_FAILED}`));
     }
 });
 
@@ -98,9 +121,11 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
 
     usersBySocketId[socket.id] = {
         username,
-        recentSends: [],
         messages: [],
         joinedAt: Date.now(),
+        messagesToday: 0,
+        imagesToday: 0,
+        recentSends: [],
         device: isMobile ? "mobile" : "desktop",
     };
 
@@ -111,6 +136,13 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
     logger.info(`User connected: ${socket.id} (${username})`);
 
     socket.on("send-message", (msg: unknown) => {
+        if (totalMessagesToday >= CFG.MAX_DAILY_MESSAGES) {
+            const hoursLeft = hoursUntilReset();
+            socket.emit("server-limit", hoursLeft);
+            gracefulDisconnect(socket);
+            return;
+        }
+
         if (
             !msg ||
             typeof msg !== "object" ||
@@ -124,6 +156,9 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
                 user: string;
             };
         };
+
+        const user = usersBySocketId[socket.id];
+        if (!user) return;
 
         let validatedReplyTo: {
             id: string;
@@ -155,28 +190,44 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
                 typeof img.size === "number"
             );
 
-            if (safeImages.length > 0) validatedImages = safeImages;
+            if (safeImages.length > 0) {
+                const remaining = CFG.MAX_DAILY_IMAGES_PER_IP - user.imagesToday;
+                if (remaining <= 0) {
+                    validatedImages = undefined;
+                    socket.emit("image-limit");
+                } else {
+                    const allowed = safeImages.slice(0, remaining);
+                    user.imagesToday += allowed.length;
+                    validatedImages = allowed;
+                }
+            }
         }
 
-        if (text.length > MAX_MESSAGE_LENGTH) return;
+        if (text.length > CFG.MAX_MESSAGE_LENGTH) return;
 
-        const user = usersBySocketId[socket.id];
-        if (!user) return;
+        // Check if user has reached the daily cap of messages sent
+        if (user.messagesToday >= CFG.MAX_DAILY_MESSAGES_PER_IP) {
+            const ip = socket._ip!;
+            if (ipCache[ip]) ipCache[ip].blocked = true;
+            socket.emit("kicked", `${SV.USER_MESSAGE_LIMIT}`);
+            logger.warn(`User kicked for reaching limit: ${socket.id}`);
+            gracefulDisconnect(socket);
+            return;
+        }
 
         const now = Date.now();
         const messageId = crypto.randomUUID();
 
-        // Remove timestamps older than SPAM_TIME
-        user.recentSends = user.recentSends.filter(t => now - t < SPAM_TIME);
-
-        // Add current timestamp
-        user.recentSends.push(now);
-        // Check if user is spamming
-        if (user.recentSends.length > SPAM_THRESHOLD) {
-            socket.emit("kicked", "You have been kicked for spamming.");
-            logger.info(`User kicked: ${socket.id}`);
-            setTimeout(() => socket.disconnect(), 150);
+        // For checking if user is spamming
+        user.recentSends = user.recentSends.filter(t => now - t < CFG.SPAM_TIME);   // Remove timestamps older than SPAM_TIME
+        user.recentSends.push(now);     // Add current timestamp
+        if (user.recentSends.length > CFG.SPAM_THRESHOLD) {
+            socket.emit("kicked", `${SV.USER_SPAM_KICK}`);
+            logger.warn(`User kicked for spamming: ${socket.id}`);
+            gracefulDisconnect(socket);
             return;
+        } else if (user.recentSends.length >= CFG.SPAM_THRESHOLD - 2) {
+            socket.emit("warn-kick");
         }
 
         user.messages.push({    // for delete purposes - store in database later
@@ -184,7 +235,10 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
             createdAt: now,
         });
 
-        // send message to everyone
+        user.messagesToday++;
+        totalMessagesToday++;
+
+        // Send/broadcast message to everyone
         chat.emit("new-message", {
             id: messageId,
             user: user.username,
@@ -258,20 +312,37 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
     });
 
     socket.on("disconnect", () => {
-        logger.info(`User disconnected: ${socket.id}`)
-        activeConnections--;
-        const ip = socket._ip;
-        delete usersBySocketId[socket.id];
-        broadcastActiveConnections();
-        broadcastUsers();
-        if (ip && connectionsPerIp[ip]) {
-            connectionsPerIp[ip]--;
-            if (connectionsPerIp[ip] <= 0) {
-                delete connectionsPerIp[ip];
-            }
-        }
+        onClientDisconnect(socket);
+    });
+
+    socket.on("afk-disconnect", () => {
+        gracefulDisconnect(socket);
     });
 });
+
+function onClientDisconnect(socket: Socket & { _ip?: string }) {
+    activeConnections--;
+    const ip = socket._ip;
+    delete usersBySocketId[socket.id];
+
+    broadcastActiveConnections();
+    broadcastUsers();
+
+    if (ip && ipCache[ip]) {
+        ipCache[ip].connections = Math.max(0, ipCache[ip].connections - 1);
+        if (ipCache[ip].connections === 0 && !ipCache[ip].blocked)
+            delete ipCache[ip];
+    }
+
+    logger.info(`User disconnected: ${socket.id}`)
+}
+
+function gracefulDisconnect(socket: Socket) {
+    setTimeout(() => {
+        onClientDisconnect(socket);
+        socket.disconnect(true);
+    }, 150);
+}
 
 function broadcastActiveConnections(): void {
     chat.emit("active-connections", activeConnections);
@@ -288,6 +359,51 @@ function broadcastUsers(): void {
     );
 }
 
-server.listen(PORT, "0.0.0.0", () => {
-    logger.info(`Server listening on port ${PORT}`);
+function scheduleMidnightReset(): void {
+    const now = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(now.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const msUntilMidnight = tomorrow.getTime() - now.getTime();
+
+    setTimeout(() => {
+        totalMessagesToday = 0;
+        // reset user counters
+        for (const socketId in usersBySocketId) {
+            usersBySocketId[socketId].messagesToday = 0;
+            usersBySocketId[socketId].imagesToday = 0;
+        }
+        // reset IP blocks
+        for (const ip in ipCache) {
+            ipCache[ip].blocked = false;
+        }
+
+        logger.info("Daily usage counters reset.");
+        scheduleMidnightReset();
+    }, msUntilMidnight);
+}
+
+function hoursUntilReset(): number {
+    const now = new Date();
+    const midnight = new Date();
+    midnight.setHours(24, 0, 0, 0); // next midnight
+    const msLeft = midnight.getTime() - now.getTime();
+    if (msLeft < 60 * 1000) return 0;
+    const hours = Math.ceil(msLeft / (1000 * 60 * 60));
+    return hours;
+}
+
+function shutdown(): void {
+    server.close(() => {
+        process.exit(1);
+    });
+
+    // Force exit if close hangs
+    setTimeout(() => process.exit(1), 5000);
+}
+
+scheduleMidnightReset();
+
+server.listen(CFG.PORT, "0.0.0.0", () => {
+    logger.info(`Server listening on port ${CFG.PORT}`);
 });

@@ -16,6 +16,9 @@ export interface ServerToClientEvents {
     "users-update": (users: UserMeta[]) => void;
     "username": (username: string) => void;
     "kicked": (reason?: string) => void;
+    "warn-kick": () => void;
+    "server-limit": (downtime: number) => void;
+    "image-limit": () => void;
 }
 
 export interface ClientToServerEvents {
@@ -29,4 +32,5 @@ export interface ClientToServerEvents {
         messageId: string;
         emoji: string;
     }) => void;
+    "afk-disconnect": () => void;
 }

@@ -17,7 +17,7 @@ export function useChat() {
         ServerToClientEvents,
         ClientToServerEvents
     > | null>(null);
-
+    
     const startChat = useCallback((username?: string, turnstileToken?: string) => {
         if (socket) return;
 
@@ -62,6 +62,11 @@ export function useChat() {
 
     const addReaction = useCallback((messageId: string, emoji: string) => {
         socket?.emit("add-reaction", { messageId, emoji });
+    }, [socket]);
+
+    const disconnectInactive = useCallback(() => {
+        socket?.emit("afk-disconnect");
+        // socket.disconnect();
     }, [socket]);
 
     useEffect(() => {
@@ -198,9 +203,17 @@ export function useChat() {
             if (!Array.isArray(users)) return;
             setUsers(users);
         });
+        socket.on("server-limit", (downtime) => {
+            sendLocalSystemMessage(LocalMessages.server_limit(downtime));
+        });
+        socket.on("image-limit", () => {
+            sendLocalSystemMessage(LocalMessages.image_limit());
+        });
         socket.on("kicked", (reason) => {
             sendLocalSystemMessage(LocalMessages.kicked(reason ?? null));
-            socket.disconnect();
+        });
+        socket.on("warn-kick", () => {
+            sendLocalSystemMessage(LocalMessages.kick_warning());
         });
         socket.on("disconnect", () => {
             sendLocalSystemMessage(LocalMessages.disconnected());
@@ -219,6 +232,7 @@ export function useChat() {
             socket.off("users-update");
             socket.off("username");
             socket.off("kicked");
+            socket.off("warn-kick");
             socket.off("connect");
             socket.off("disconnect");
             socket.off("connect_error");
@@ -245,5 +259,6 @@ export function useChat() {
         deleteMessage,
         addReaction,
         sendLocalSystemMessage,
+        disconnectInactive,
     };
 }

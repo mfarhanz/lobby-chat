@@ -20,6 +20,7 @@ export default function App() {
         deleteMessage,
         addReaction,
         sendLocalSystemMessage,
+        disconnectInactive,
     } = useChat();
 
     const [usersOpen, setUsersOpen] = useState(false);
@@ -70,6 +71,7 @@ export default function App() {
                     deleteMessage={deleteMessage}
                     addReaction={addReaction}
                     sendLocalMessage={sendLocalSystemMessage}
+                    disconnectInactiveClient={disconnectInactive}
                 />
 
                 {usersOpen && (
