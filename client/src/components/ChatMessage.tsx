@@ -13,6 +13,7 @@ import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
 import type { DOMEvent, MessageData } from "../types/chat";
 import { lazy, memo, Suspense, useCallback, useMemo } from "react";
+import { SkeletonImage } from "./SkeletonImage";
 
 interface ChatMessageProps extends DOMEvent {
     msg: MessageData;
@@ -211,26 +212,22 @@ export const ChatMessage = memo(function ChatMessage({
             {/* Chat message image attachments */}
             {msg.images && (
                 msg.images.length === 1 ? (
-                    <img
+                    <SkeletonImage 
                         src={msg.images[0].url}
-                        alt="uploaded"
-                        className="chat-message-image-single"   // fixed aspect ratio not used here to preserve image dims
-                        loading="lazy"
                         onClick={() => onImageClick(msg.images?.[0].url ?? null)}
-                        onLoad={() => onSizeChange?.()}     // needed to readjust chatmessage height after virtualization
+                        onLoad={() => onSizeChange?.()}             // needed to readjust chatmessage height after virtualization
                         onError={onImageError}
+                        className="chat-message-image-single"       // fixed aspect ratio not used here to preserve image dims
                     />
                 ) : (
                     <div className="chat-message-images-group">
                         {msg.images.map((img) => (
-                            <img
+                            <SkeletonImage
                                 key={img.id}
                                 src={img.url}
-                                alt="uploaded"
-                                className="chat-message-image-multi"
-                                loading="lazy"
                                 onClick={() => onImageClick(img.url)}
                                 onError={onImageError}
+                                className="chat-message-image-multi"
                             />
                         ))}
                     </div>
@@ -257,5 +254,9 @@ export const ChatMessage = memo(function ChatMessage({
         </div>
     );
 }, (prev, next) => {        // only re-render this chat message if any of these are false
-    return prev.msg === next.msg && prev.isCopied === next.isCopied && prev.isEmojiPickerOpen === next.isEmojiPickerOpen;
+    return ( 
+        prev.msg === next.msg && 
+        prev.isCopied === next.isCopied && 
+        prev.isEmojiPickerOpen === next.isEmojiPickerOpen 
+    );
 });
