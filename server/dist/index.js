@@ -138,6 +138,7 @@ chat.use(async (socket, next) => {
         next();
     }
     catch (err) {
+        logger_1.logger.warn(`${constants_1.SERVER_MESSAGES.CF_ERROR}: ${err}`);
         return next(new Error(`${constants_1.SERVER_MESSAGES.CF_FAILED}`));
     }
 });
@@ -160,9 +161,8 @@ chat.on("connection", (socket) => {
     logger_1.logger.info(`User connected: ${socket.id} (${username})`);
     socket.on("send-message", (msg) => {
         if (totalMessagesToday >= CFG.MAX_DAILY_MESSAGES) {
-            const hoursLeft = hoursUntilReset();
-            socket.emit("server-limit", hoursLeft);
-            gracefulDisconnect(socket);
+            socket.emit("server-limit", hoursUntilReset());
+            disconnectSocket(socket);
             return;
         }
         if (!msg ||
@@ -215,7 +215,7 @@ chat.on("connection", (socket) => {
                 ipCache[ip].blocked = true;
             socket.emit("kicked", `${constants_1.SERVER_MESSAGES.USER_MESSAGE_LIMIT}`);
             logger_1.logger.warn(`User kicked for reaching limit: ${socket.id}`);
-            gracefulDisconnect(socket);
+            disconnectSocket(socket);
             return;
         }
         const now = Date.now();
@@ -226,7 +226,7 @@ chat.on("connection", (socket) => {
         if (user.recentSends.length > CFG.SPAM_THRESHOLD) {
             socket.emit("kicked", `${constants_1.SERVER_MESSAGES.USER_SPAM_KICK}`);
             logger_1.logger.warn(`User kicked for spamming: ${socket.id}`);
-            gracefulDisconnect(socket);
+            disconnectSocket(socket);
             return;
         }
         else if (user.recentSends.length >= CFG.SPAM_THRESHOLD - 2) {
@@ -304,10 +304,13 @@ chat.on("connection", (socket) => {
         onClientDisconnect(socket);
     });
     socket.on("afk-disconnect", () => {
-        gracefulDisconnect(socket);
+        disconnectSocket(socket);
     });
 });
 function onClientDisconnect(socket) {
+    if (socket._disconnected)
+        return; // already handled
+    socket._disconnected = true;
     activeConnections--;
     const ip = socket._ip;
     delete usersBySocketId[socket.id];
@@ -315,16 +318,14 @@ function onClientDisconnect(socket) {
     broadcastUsers();
     if (ip && ipCache[ip]) {
         ipCache[ip].connections = Math.max(0, ipCache[ip].connections - 1);
-        if (ipCache[ip].connections === 0 && !ipCache[ip].blocked)
+        if (ipCache[ip].connections === 0 && ipCache[ip].blocked)
             delete ipCache[ip];
     }
     logger_1.logger.info(`User disconnected: ${socket.id}`);
 }
-function gracefulDisconnect(socket) {
-    setTimeout(() => {
-        onClientDisconnect(socket);
-        socket.disconnect(true);
-    }, 150);
+function disconnectSocket(socket) {
+    onClientDisconnect(socket);
+    socket.disconnect(true);
 }
 function broadcastActiveConnections() {
     chat.emit("active-connections", activeConnections);

@@ -22,10 +22,9 @@ import { Drawer } from "./Drawer";
 import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
 import { usePaste } from "../hooks/usePaste";
-import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult } from "../types/chat";
 import { UsernameModal } from "./UsernameModal";
-import { LocalMessages } from "../data/localMessages";
 import { useInactivityCheck } from "../hooks/useInactivityCheck";
+import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult } from "../types/chat";
 
 export interface ChatProps {
     username: string,
@@ -132,11 +131,6 @@ export const Chat = memo(function Chat({
     });
 
     useEffect(() => {
-        if (!connected || !username) return;
-        sendLocalMessage(LocalMessages.welcome(username));
-    }, [connected, username, sendLocalMessage]);
-
-    useEffect(() => {
         if (!embed) return;
         return () => URL.revokeObjectURL(embed);
     }, [embed]);
@@ -149,7 +143,7 @@ export const Chat = memo(function Chat({
         };
     }, []);
 
-    const scrollToListEndSmooth = () => {
+    const scrollToListEndSmooth = useCallback(() => {
         const el = outerRef.current;
         if (!el) return;
 
@@ -157,7 +151,7 @@ export const Chat = memo(function Chat({
             top: el.scrollHeight,
             behavior: "smooth",
         });
-    };
+    }, [outerRef]);
 
     useEffect(() => {
         if (!lastId) return;
@@ -517,15 +511,15 @@ export const Chat = memo(function Chat({
 
     ///////////////////////////////////////////TESTING///////////////////////////////////////////////////////////////////
     // console.log("Chat render");  // testing - this will print whenever chat re-renders
-    const prevRef = useRef<unknown>(null);
-    useEffect(() => {   // runs whenever chat rerenders
-        if (prevRef.current === null) {
-            console.log("First render");        // if this prints, object is still the same as original in memory
-        } else if (prevRef.current !== rowRefs) {
-            console.log("Reference changed!");      // if this prints, object recreated anew every time in memory
-        }
-        prevRef.current = rowRefs;       // if nothing prints, object is unchanged since initial creation
-    });
+    // const prevRef = useRef<unknown>(null);
+    // useEffect(() => {   // runs whenever chat rerenders
+    //     if (prevRef.current === null) {
+    //         console.log("First render");        // if this prints, object is still the same as original in memory
+    //     } else if (prevRef.current !== deleteMessage) {
+    //         console.log("Reference changed!");      // if this prints, object recreated anew every time in memory
+    //     }
+    //     prevRef.current = deleteMessage;       // if nothing prints, object is unchanged since initial creation
+    // });
     /////////////////////////////////////////////TESTING/////////////////////////////////////////////////////////////////
 
     return (
@@ -567,7 +561,8 @@ export const Chat = memo(function Chat({
 
                     {/* Media preview row */}
                     {(embed || uploads.length > 0) && (
-                        <div className="absolute bottom-full left-2 -mb-px flex items-baseline gap-2 py-0.5"
+                        <div className="absolute gap-2 py-0.5 bottom-full left-2 -right-9 -mb-px flex items-baseline 
+                                        overflow-x-auto overflow-y-hidden whitespace-nowrap"
                         >
                             {embed && (
                                 <Thumbnail

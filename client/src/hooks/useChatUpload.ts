@@ -5,8 +5,6 @@ export function useChatUpload() {
     const [uploads, setUploads] = useState<FileData[]>([]);
     const uploadsRef = useRef<FileData[]>([]);
 
-    // console.log("usechatupload");
-
     const cleanupPreviewUrls = useCallback(() => {
         uploadsRef.current.forEach(({ url }) => {
             URL.revokeObjectURL(url);

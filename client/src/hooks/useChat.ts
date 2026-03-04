@@ -23,7 +23,8 @@ export function useChat() {
 
         const newSocket = io(import.meta.env.VITE_SOCKET_URL + "/chat", {
             // path: "/socket",
-            auth: { username, turnstileToken: turnstileToken }
+            auth: { username, turnstileToken: turnstileToken },
+            // autoConnect: false
         });
 
         setSocket(newSocket);
@@ -66,11 +67,11 @@ export function useChat() {
 
     const disconnectInactive = useCallback(() => {
         socket?.emit("afk-disconnect");
-        // socket.disconnect();
     }, [socket]);
 
     useEffect(() => {
         if (!socket) return;
+        // socket.connect();
 
         const handleSendMessage = (msg: unknown) => {
             if (!msg || typeof msg !== "object") return;
@@ -193,7 +194,10 @@ export function useChat() {
         };
 
         socket.on("connect", () => setConnected(true));
-        socket.on("username", setUsername);
+        socket.on("username", (name) => {
+            setUsername(name);
+            sendLocalSystemMessage(LocalMessages.welcome(name));
+        });
         socket.on("new-message", handleSendMessage);
         socket.on("delete-message-public", handleDeleteMessage);
         socket.on("edit-message", handleEditMessage);

@@ -10,11 +10,12 @@ const path_1 = __importDefault(require("path"));
 const logDir = path_1.default.join(process.cwd(), "logs");
 const dailyRotate = new winston_daily_rotate_file_1.default({
     dirname: logDir,
-    filename: "app-%DATE%.log",
+    filename: "app-%DATE%",
     datePattern: "YYYY-MM-DD",
     zippedArchive: false,
+    extension: ".log",
     maxSize: "20m",
-    maxFiles: "14d",
+    maxFiles: 30,
 });
 exports.logger = winston_1.default.createLogger({
     level: "info",

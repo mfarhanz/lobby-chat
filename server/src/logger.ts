@@ -6,11 +6,12 @@ const logDir = path.join(process.cwd(), "logs");
 
 const dailyRotate = new DailyRotateFile({
     dirname: logDir,
-    filename: "app-%DATE%.log",
+    filename: "app-%DATE%",
     datePattern: "YYYY-MM-DD",
     zippedArchive: false,
+    extension: ".log",
     maxSize: "20m",
-    maxFiles: "14d",
+    maxFiles: 30,
 });
 
 export const logger = winston.createLogger({

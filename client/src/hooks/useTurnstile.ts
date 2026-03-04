@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export function useTurnstile(startChat: (username?: string, token?: string) => void) {
     const rendered = useRef(false);
     const [token, setToken] = useState<string | null>(null);
-    // console.log("useturnstile");
 
     // render turnstile once, immediately
     useEffect(() => {
@@ -19,7 +18,7 @@ export function useTurnstile(startChat: (username?: string, token?: string) => v
                     size: "normal",
                     theme: "light",
                     callback: (t: string) => {
-                        console.log("Turnstile passed:", t);
+                        console.info("Turnstile passed:", t);
                         setTimeout(() => {
                             document.getElementById("turnstile-overlay")?.remove();
                         }, 1000);
@@ -42,7 +41,7 @@ export function useTurnstile(startChat: (username?: string, token?: string) => v
     const submitUsername = useCallback(
         (username: string | null) => {
             if (!token) {
-                alert("Please complete the verification first!");
+                alert("Turnstile verification not completed! Please reload the page.");
                 return;
             }
             startChat(username ?? undefined, token);
@@ -50,5 +49,5 @@ export function useTurnstile(startChat: (username?: string, token?: string) => v
         [token, startChat]
     );
 
-    return { submitUsername, token };
+    return { submitUsername };
 }
