@@ -1,4 +1,4 @@
-import type { MessageData, UserMeta, SendPayload } from "./chat";
+import type { MessageData, UserMeta, UserIdentity, SendPayload } from "./chat";
 
 export interface ServerToClientEvents {
     "new-message": (msg: MessageData) => void;
@@ -14,7 +14,7 @@ export interface ServerToClientEvents {
     }) => void;
     "active-connections": (count: number) => void;
     "users-update": (users: UserMeta[]) => void;
-    "username": (username: string) => void;
+    "user-confirm": (user: UserIdentity) => void;
     "kicked": (reason?: string) => void;
     "warn-kick": () => void;
     "server-limit": (downtime: number) => void;

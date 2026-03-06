@@ -11,13 +11,13 @@ import { IconButton } from "./IconButton";
 import { useLongPress } from "../hooks/useLongPress";
 import { TOUCH_DEVICE } from "../utils/device";
 import { Spinner } from "./Spinner";
-import type { DOMEvent, MessageData } from "../types/chat";
+import type { DOMEvent, MessageData, UserIdentity } from "../types/chat";
 import { lazy, memo, Suspense, useCallback, useMemo } from "react";
 import { SkeletonImage } from "./SkeletonImage";
 
 interface ChatMessageProps extends DOMEvent {
     msg: MessageData;
-    username: string;
+    user: UserIdentity;
     today: Date;
     onReplyJump: (id: string) => void;
     replyingTo: MessageData | null;
@@ -38,7 +38,7 @@ const EmojiPicker = lazy(() => import("./EmojiPicker"));
 
 export const ChatMessage = memo(function ChatMessage({
     msg,
-    username,
+    user,
     today,
     onReplyJump,
     replyingTo,
@@ -97,12 +97,13 @@ export const ChatMessage = memo(function ChatMessage({
     const handleEmojiReactionClose = useCallback(() => {
         onSetEmojiPickerOpenId(null);
     }, [onSetEmojiPickerOpenId]);
-
+ 
     return (
         <div
+            // TODO: fix pinging users with the same username
             className={`chat-message text-message 
-                        ${msg.user === username ? "chat-message-self" : ""}
-                        ${(msg.replyTo?.user === username || msg.text.includes(`@${username}`)) ? "chat-message-ping" : ""}
+                        ${msg.user.handle === user.handle ? "chat-message-self" : ""}
+                        ${(msg.replyTo?.userId.handle === user.handle || msg.text.includes(`@${user.name}`)) ? "chat-message-ping" : ""}
                         `}
             {...longPress}
         >
@@ -115,7 +116,7 @@ export const ChatMessage = memo(function ChatMessage({
                     >
                         {replyingTo ? (
                             <>
-                                <span className="text-mention-xs">{msg.replyTo!.user}</span>
+                                <span className="text-mention-xs">{msg.replyTo.userId.name}</span>
                                 {replyingTo.text.length > 75
                                     ? replyingTo.text.slice(0, 75) + " ..."
                                     : replyingTo.text}
@@ -150,7 +151,7 @@ export const ChatMessage = memo(function ChatMessage({
                         onClick={() => onSetEmojiPickerOpenId(msg.id)}
                     />
 
-                    {msg.user === username && (
+                    {msg.user.handle === user.handle && (
                         <IconButton
                             icon={<EditIcon className="size-4" />}
                             title="Edit"
@@ -166,7 +167,7 @@ export const ChatMessage = memo(function ChatMessage({
                         onClick={() => onCopy(msg)}
                     />
 
-                    {msg.user === username && (
+                    {msg.user.handle === user.handle && (
                         <IconButton
                             icon={<TrashIcon className="size-4" />}
                             title="Delete"
@@ -186,7 +187,7 @@ export const ChatMessage = memo(function ChatMessage({
 
             {/* Message header row */}
             <div className="chat-message-header">
-                <span className="chat-message-username">{msg.user}</span>
+                <span className={`chat-message-username ${msg.system ? "chat-message-username-admin" : ""}`}>{msg.user.name}</span>
                 <span className="chat-message-time">
                     {formatTimestamp(msg.timestamp, today)}
                 </span>
@@ -240,14 +241,14 @@ export const ChatMessage = memo(function ChatMessage({
                     <div
                         key={r.emoji}
                         className={`reaction-tag 
-                                    ${r.users.includes(username)
+                                    ${r.userIds.includes(user.handle)
                                 ? "bg-blue-500/25 text-blue-300 "
                                 : "bg-zinc-700/70"
                             }`}
                         onClick={() => onAddReaction(msg.id, r.emoji)}
                     >
                         <span>{r.emoji}</span>
-                        {r.users.length > 1 && <span className="text-xs">{r.users.length}</span>}
+                        {r.userIds.length > 1 && <span className="text-xs">{r.userIds.length}</span>}
                     </div>
                 ))}
             </div>

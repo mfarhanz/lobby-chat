@@ -24,10 +24,10 @@ import { Spinner } from "./Spinner";
 import { usePaste } from "../hooks/usePaste";
 import { UsernameModal } from "./UsernameModal";
 import { useInactivityCheck } from "../hooks/useInactivityCheck";
-import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult } from "../types/chat";
+import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult, UserIdentity } from "../types/chat";
 
 export interface ChatProps {
-    username: string,
+    user: UserIdentity | undefined,
     users: string[],
     messages: Map<string, MessageData>;
     messageOrder: string[];
@@ -45,7 +45,7 @@ export interface ChatProps {
 const EmojiPicker = lazy(() => import("./EmojiPicker"));
 
 export const Chat = memo(function Chat({
-    username,
+    user,
     users,
     messages,
     messageOrder,
@@ -76,10 +76,10 @@ export const Chat = memo(function Chat({
     const messagesRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const sizeMap = useRef(new Map<string, number>());
-    const listRef = useRef<VariableSizeList>(null);
     const outerRef = useRef<HTMLDivElement | null>(null);
     const rowRefs = useRef(new Map<string, HTMLDivElement>());
+    const listRef = useRef<VariableSizeList>(null);
+    const sizeMap = useRef(new Map<string, number>());
 
     const isAtBottom = useRef(true);
     const scrollRafScheduled = useRef(false);
@@ -159,10 +159,10 @@ export const Chat = memo(function Chat({
         const lastMessage = messages.get(lastId);
         if (isAtBottom.current) {
             scrollToListEndSmooth();
-        } else if (lastMessage?.user === username) {
+        } else if (lastMessage?.user.handle === user?.handle) {
             listRef.current?.scrollToItem(messageOrder.length - 1, "end");
         }
-    }, [lastId, username]);    // ignore warning, do not add messages or messageOrder here!
+    }, [lastId, user]);    // ignore warning, do not add messages or messageOrder here!
 
     useLayoutEffect(() => {
         if (!messagesRef.current) return;
@@ -410,7 +410,7 @@ export const Chat = memo(function Chat({
     const onReplyMessage = useCallback((m: MessageData) => {
         setAction({
             type: "reply",
-            name: m.user,
+            userId: m.user,
             messageId: m.id,
         });
         textareaRef.current?.focus();
@@ -456,7 +456,7 @@ export const Chat = memo(function Chat({
                     setDrawerMessage(null);
                 },
             },
-            ...(drawerMessage.user === username
+            ...(drawerMessage.user.handle === user?.handle
                 ? [
                     {
                         key: "edit",
@@ -480,12 +480,12 @@ export const Chat = memo(function Chat({
                 ]
                 : []),
         ];
-    }, [username, drawerMessage, onReplyMessage, onCopyMessage, onEditMessage, onDeleteMessage, setEmojiPickerOpenId]);
+    }, [user, drawerMessage, onReplyMessage, onCopyMessage, onEditMessage, onDeleteMessage, setEmojiPickerOpenId]);
 
     const itemData = useMemo(() => ({
         messages,
         messageOrder,
-        username,
+        user,
         today,
         copyId,
         emojiPickerOpenId,
@@ -505,7 +505,7 @@ export const Chat = memo(function Chat({
             onSetEmojiPickerOpenId: setEmojiPickerOpenId,
             onLongPressMessage: onLongPress,
         }
-    }), [messages, messageOrder, username, today, copyId, emojiPickerOpenId, registerRef, scrollToMessage,
+    }), [messages, messageOrder, user, today, copyId, emojiPickerOpenId, registerRef, scrollToMessage,
         onCopyMessage, onReplyMessage, onEditMessage, onDeleteMessage, addReaction, handleImageError, onLongPress]);
 
 
@@ -546,9 +546,6 @@ export const Chat = memo(function Chat({
                         itemData={itemData}
                         overscanCount={1}
                         onScroll={({ scrollOffset }) => handleScroll(scrollOffset)}
-                    // onItemsRendered={({ visibleStartIndex, visibleStopIndex }) => {
-                    //     console.log("Visible items:", visibleStopIndex - visibleStartIndex + 1);
-                    // }}
                     >
                         {ChatWindow}
                     </VariableSizeList>
@@ -588,7 +585,7 @@ export const Chat = memo(function Chat({
                     {action && (
                         <ChatActionBar
                             type={action.type}
-                            name={action.type === "reply" ? action.name : undefined}
+                            name={action.type === "reply" ? action.userId.name : undefined}
                             onClose={() => setAction(null)}
                         />
                     )}

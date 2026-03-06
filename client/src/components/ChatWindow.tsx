@@ -6,7 +6,7 @@ export const ChatWindow = memo(function ChatWindow({ index, style, data }: ListC
     const {
         messages,
         messageOrder,
-        username,
+        user,
         today,
         copyId,
         emojiPickerOpenId,
@@ -45,7 +45,7 @@ export const ChatWindow = memo(function ChatWindow({ index, style, data }: ListC
                 <ChatMessage
                     id={`msg-${msgId}`}
                     msg={msg}
-                    username={username}
+                    user={user}
                     today={today}
                     replyingTo={replyToMessage}
                     onReplyJump={scrollToMessage}

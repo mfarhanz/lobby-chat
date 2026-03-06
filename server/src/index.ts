@@ -1,5 +1,6 @@
 import express from "express";
 import http from "http";
+import { nanoid } from "nanoid";
 import { logger } from "./logger";
 import { Server, Socket } from "socket.io";
 import { UserMeta, MediaMeta, IpMeta } from "./types/meta";
@@ -118,10 +119,14 @@ chat.use(async (socket: Socket & { _ip?: string }, next) => {
 chat.on("connection", (socket: Socket & { _ip?: string }) => {
     activeConnections++;
     const username = socket.data.username;
+    const handle = username + nanoid(11);
+    const usercode = generateUserDiscriminator(username);
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(socket.handshake.headers["user-agent"] || "");
 
     usersBySocketId[socket.id] = {
         username,
+        userHandle: handle,
+        userCode: usercode,
         messages: [],
         joinedAt: Date.now(),
         messagesToday: 0,
@@ -130,7 +135,7 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
         device: isMobile ? "mobile" : "desktop",
     };
 
-    socket.emit("username", username);
+    socket.emit("user-confirm", { name: username, handle: handle });
     broadcastActiveConnections();
     broadcastUsers();
 
@@ -153,7 +158,10 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
             text: string;
             replyTo?: {
                 id: string;
-                user: string;
+                userId: {
+                    name: string,
+                    handle: string
+                };
             };
         };
 
@@ -162,18 +170,21 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
 
         let validatedReplyTo: {
             id: string;
-            user: string;
+            userId: {
+                name: string,
+                handle: string
+            };
         } | undefined;
 
         if (
             replyTo &&
             typeof replyTo === "object" &&
             typeof replyTo.id === "string" &&
-            typeof replyTo.user === "string"
+            typeof replyTo.userId === "object"
         ) {
             validatedReplyTo = {
                 id: replyTo.id,
-                user: replyTo.user,
+                userId: replyTo.userId,
             };
         }
 
@@ -241,7 +252,7 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
         // Send/broadcast message to everyone
         chat.emit("new-message", {
             id: messageId,
-            user: user.username,
+            user: { name: user.username, handle: user.userHandle },
             text,
             timestamp: now,
             images: validatedImages,
@@ -282,7 +293,7 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
         chat.emit("add-reaction", {
             messageId,
             emoji,
-            user: user.username
+            user: user.userHandle
         });
     });
 
@@ -353,6 +364,8 @@ function broadcastUsers(): void {
         "users-update",
         Object.values(usersBySocketId).map(user => ({
             username: user.username,
+            userHandle: user.userHandle,
+            userCode: user.userCode,
             joinedAt: user.joinedAt,
             device: user.device,
         }))
@@ -391,6 +404,23 @@ function hoursUntilReset(): number {
     if (msLeft < 60 * 1000) return 0;
     const hours = Math.ceil(msLeft / (1000 * 60 * 60));
     return hours;
+}
+
+function generateUserDiscriminator(username: string): string {
+    const used = new Set<string>();
+    for (const user of Object.values(usersBySocketId)) {
+        if (user.username === username) {
+            used.add(user.userCode);
+        }
+    }
+
+    while (true) {
+        const id = Math.floor(Math.random() * 10000)
+            .toString()
+            .padStart(4, "0");
+
+        if (!used.has(id)) return id;
+    }
 }
 
 function shutdown(): void {

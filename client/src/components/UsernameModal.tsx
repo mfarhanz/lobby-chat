@@ -2,9 +2,9 @@ import { useState } from "react";
 import { generateUsernameSet } from "../utils/username";
 import { ChevronIcon } from "./icons/ChevronIcon";
 
-export function UsernameModal({ onSubmit }: { onSubmit: (name: string | null) => void }) {
+export function UsernameModal({ onSubmit }: { onSubmit: (name: string) => void }) {
     const [names, setNames] = useState(() => generateUsernameSet());
-    const [selected, setSelected] = useState<string | null>(null);
+    const [username, setUsername] = useState<string>("");
 
     return (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
@@ -13,45 +13,52 @@ export function UsernameModal({ onSubmit }: { onSubmit: (name: string | null) =>
                 <h2 className="text-2xl font-semibold mb-4 text-center">Pick a username</h2>
 
                 {/* Username Tiles */}
-                <div className="flex flex-wrap gap-2 mb-6 justify-center font-sans">
+                <div className="flex flex-wrap gap-2 mb-4 justify-center font-sans">
                     {names.map(n => (
                         <div
                             key={n}
                             className={`cursor-pointer px-3 py-2 rounded-md text-center transition
-                ${selected === n ? "bg-zinc-600 font-semibold" : "bg-zinc-700 hover:bg-zinc-600"}`}
-                            onClick={() => setSelected(n)}
+                                        ${username === n 
+                                            ? "bg-zinc-600 font-semibold" 
+                                            : "bg-zinc-700 hover:bg-zinc-600"}`}
+                            onClick={() => setUsername(n)}
                         >
                             {n}
                         </div>
                     ))}
                 </div>
 
-                {/* Selected Username Display */}
+                {/* Editable Username Display */}
                 <div className="flex items-center justify-center mb-6 text-zinc-400 font-mono text-lg">
-                    <span className="mr-2 select-none"><ChevronIcon className="size-5" /></span>
-                    <div className="relative h-6 w-75  overflow-hidden">
-                        <span
-                            key={selected}
-                            className="block animate-text-slide text-zinc-100 font-semibold whitespace-nowrap"
-                        >
-                            {selected ?? ""}
-                        </span>
+                    <span className="mr-1 mt-2 select-none">
+                        <ChevronIcon className="size-5" />
+                    </span>
+                    <div className="relative h-6 w-75 ">
+                        <input
+                            value={username ?? ""}
+                            onChange={(e) => setUsername(e.target.value)}
+                            placeholder="Type or choose a name..."
+                            maxLength={30}
+                            className="block w-full p-1 text-zinc-100 font-semibold whitespace-nowrap outline-none rounded border border-zinc-600"
+                        />
                     </div>
                 </div>
 
                 {/* Buttons */}
                 <div className="flex justify-end gap-3 mt-auto">
                     <button
-                        className="px-4 py-2 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-100 transition"
+                        className="px-4 py-2 rounded-md bg-zinc-700 hover:bg-zinc-600 text-zinc-100 transition cursor-pointer"
                         onClick={() => setNames(generateUsernameSet())}
                     >
                         Reroll
                     </button>
                     <button
-                        className={`px-4 py-2 rounded-md text-zinc-100 transition 
-              ${selected ? "bg-blue-600 hover:bg-blue-500" : "bg-zinc-600 cursor-not-allowed"}`}
-                        disabled={!selected}
-                        onClick={() => selected && onSubmit(selected)}
+                        className={`px-4 py-2 rounded-md text-zinc-100 transition
+                                    ${username.trim().length >= 3 
+                                        ? "bg-blue-600 hover:bg-blue-500 cursor-pointer" 
+                                        : "bg-zinc-600 cursor-not-allowed"}`}
+                        disabled={username.trim().length < 3}
+                        onClick={() => username && onSubmit(username)}
                     >
                         Join Chat
                     </button>

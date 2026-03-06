@@ -58,7 +58,7 @@ export function useChatSend({
                 ...(action?.type === "reply" && {
                     replyTo: {                  // if replying to someone, create a reply object
                         id: action.messageId,
-                        user: action.name
+                        userId: action.userId
                     }
                 })
             };

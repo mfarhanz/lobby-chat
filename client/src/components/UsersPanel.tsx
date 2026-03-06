@@ -2,10 +2,10 @@ import { memo, useState } from "react";
 import NumberFlow from "@number-flow/react";
 import { MobileIcon } from "./icons/MobileIcon";
 import { ComputerIcon } from "./icons/ComputerIcon";
-import type { UserMeta, SessionUserStatsMeta } from "../types/chat";
+import type { UserMeta, SessionUserStatsMeta, UserIdentity } from "../types/chat";
 
 export interface UserProps {
-    username: string;
+    user: UserIdentity | undefined;
     users: UserMeta[];
     userCount: number;
     userStats: React.RefObject<Record<string, SessionUserStatsMeta>>;
@@ -13,13 +13,13 @@ export interface UserProps {
 };
 
 export const UsersPanel = memo(function UsersPanel({
-    username,
+    user,
     users,
     userCount,
     userStats,
     mobileView,
 }: UserProps) {
-    const [activeUser, setActiveUser] = useState<{ username: string; joinedAt: number; } | null>(null);
+    const [activeUser, setActiveUser] = useState<{ id: string; joinedAt: number; } | null>(null);
     const [now, setNow] = useState<number>(() => Date.now());
 
     // console.log("Userpanel render"); // testing - this prints whenever panel re-renders
@@ -48,38 +48,44 @@ export const UsersPanel = memo(function UsersPanel({
     return (
         <aside className={`users-panel ${mobileView ? "mobile-open" : ""}`}>
             <div className="flex-1 overflow-y-auto pr-1 space-y-2 hide-scrollbar">
-                {users.map((user) => {
-                    const expand = activeUser?.username === user.username;
-                    const stats = userStats.current?.[user.username];
+                {users.map((u) => {
+                    const expand = activeUser?.id === u.userHandle;
+                    const stats = userStats.current?.[u.userHandle];
                     const messageCount = stats?.messageCount ?? 0;
-                    const lastActive = stats?.lastActive ?? user.joinedAt;
+                    const lastActive = stats?.lastActive ?? u.joinedAt;
 
                     return (
                         <div
-                            key={user.username}
+                            key={u.userHandle}
                             className={`user-item cursor-pointer ${expand ? "expanded bg-zinc-700" : ""}`}
                             onClick={() => {
                                 setNow(Date.now());
                                 setActiveUser(
-                                    expand ? null : user
+                                    expand ? null : { id: u.userHandle, joinedAt: u.joinedAt }
                                 );
                             }}
                         >
                             {/* Username list item*/}
                             <div
-                                className={`overflow-hidden wrap-break-word ${expand ? "text-lg" : "text-sm"} 
-                                            ${user.username === username ? "text-emerald-200" : ""} 
+                                className={`overflow-hidden wrap-break-word space-x-2 ${expand ? "text-lg" : "text-sm"} 
+                                            ${u.userHandle === user?.handle ? "text-emerald-200" : ""} 
                                             transition-[font-size] duration-200 ease-out`}
                             >
-                                {user.username}
+                                <span>{u.username}</span>
+                                <span
+                                    className={`text-neutral-500 transition-opacity duration-300 ease-out 
+                                                ${expand ? "opacity-100" : "opacity-0"}`}
+                                >
+                                    #{u.userCode}
+                                </span>
                             </div>
 
                             {/* Expanded list item */}
                             <div className={`leading-tight ${expand ? "mt-2 text-[0.75rem]" : "text-[0rem]"}  
                                             text-zinc-400 transition-[font-size] duration-300 min-h-0 overflow-hidden`}>
                                 <div>
-                                    Joined the chat <span className={`${timeColor(user.joinedAt, now)}`}>
-                                        {formatRelativeTime(user.joinedAt, now)}
+                                    Joined the chat <span className={`${timeColor(u.joinedAt, now)}`}>
+                                        {formatRelativeTime(u.joinedAt, now)}
                                     </span> ago
                                 </div>
                                 <div>
@@ -91,7 +97,7 @@ export const UsersPanel = memo(function UsersPanel({
                                     Messages sent: <span className="text-indigo-400">{messageCount}</span>
                                 </div>
                                 <div className={`flex justify-end ${expand ? "scale-100" : "scale-0"} transition-transform duration-200`}>
-                                    {user.device === "mobile" ? (
+                                    {u.device === "mobile" ? (
                                         <MobileIcon className="size-5 text-zinc-300" />
                                     ) : (
                                         <ComputerIcon className="size-5 text-zinc-300" />

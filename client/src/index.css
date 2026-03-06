@@ -174,7 +174,7 @@ body {
   /* .chat-message-self {} */
 
   .chat-message-text-wrapper {
-    /* @apply flex flex-wrap items-baseline gap-x-4 gap-y-1; */
+    /* @apply flex flex-wrap items-baseline gap-x-4 gap-y-1;   ??   */
     @apply block;
   }
 
@@ -184,6 +184,10 @@ body {
 
   .chat-message-username {
     @apply font-semibold text-indigo-200;
+  }
+
+  .chat-message-username-admin {
+    @apply bg-emerald-900 text-lime-200;
   }
 
   .chat-message-self .chat-message-username {
@@ -426,21 +430,5 @@ body {
 
   .group:hover .status-tooltip {
     opacity: 1;
-  }
-
-  @keyframes text-slide {
-    from {
-      transform: translateY(100%);
-      opacity: 0;
-    }
-
-    to {
-      transform: translateY(0%);
-      opacity: 1;
-    }
-  }
-
-  .animate-text-slide {
-    animation: text-slide 0.2s ease-out;
   }
 }

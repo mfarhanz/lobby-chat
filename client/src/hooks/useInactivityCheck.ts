@@ -15,8 +15,6 @@ export function useInactivityCheck({
     const lastActivityRef = useRef<number>(0);
     const hasWarnedRef = useRef<boolean>(false);
 
-    // console.log("inactivitycheck");
-
     function recordActivity() {
         lastActivityRef.current = Date.now();
         hasWarnedRef.current = false;
@@ -47,7 +45,7 @@ export function useInactivityCheck({
             if (idleTime >= INACTIVE_WARNING_TIME && !hasWarnedRef.current) {
                 hasWarnedRef.current = true;
                 sendLocalSystemMessage(
-                    "You have been inactive for 25 minutes. You will be disconnected in 5 minutes if no activity is detected."
+                    "You have been inactive for 25 minutes. You will be disconnected in **5 minutes** if no activity is detected."
                 );
             }
             if (idleTime >= INACTIVE_DISCONNECT_TIME) {

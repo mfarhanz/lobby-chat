@@ -11,7 +11,7 @@ export default function App() {
         userCount,
         userStats,
         users,
-        username,
+        userId,
         messages,
         messageOrder,
         startChat,
@@ -25,7 +25,7 @@ export default function App() {
 
     const [usersOpen, setUsersOpen] = useState(false);
 
-    const usernames = useMemo(
+    const usernames = useMemo(          // needed?
         () => users.map(u => u.username),
         [users]
     );
@@ -60,7 +60,7 @@ export default function App() {
 
             <main className="app-main">
                 <Chat
-                    username={username}
+                    user={userId}
                     users={usernames}
                     messages={messages}
                     messageOrder={messageOrder}
@@ -82,7 +82,7 @@ export default function App() {
                 )}
 
                 <UsersPanel
-                    username={username}
+                    user={userId}
                     users={users}
                     userCount={userCount}
                     userStats={userStats}

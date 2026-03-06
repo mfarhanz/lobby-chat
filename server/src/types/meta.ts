@@ -1,5 +1,7 @@
-export type UserMeta = {
+export interface UserMeta {
   username: string;
+  userHandle: string;
+  userCode: string;       // discriminator for users with the same name
   messages: MessageMeta[];
   joinedAt: number;
   messagesToday: number;
@@ -8,17 +10,17 @@ export type UserMeta = {
   device: string;
 };
 
-export type IpMeta = {
+export interface IpMeta {
     connections: number;
     blocked: boolean;
 };
 
-export type MessageMeta = {
+export interface MessageMeta {
   id: string;
   createdAt: number;
 };
 
-export type MediaMeta = {
+export interface MediaMeta {
   id: string;
   key: string;
   url: string;

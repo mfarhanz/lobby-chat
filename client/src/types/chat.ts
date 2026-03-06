@@ -1,9 +1,10 @@
 export interface MessageData {
     id: string;
-    user: string;
+    user: UserIdentity;
     text: string;
     timestamp: number;
     edited?: boolean;
+    system?: boolean;
     replyTo?: ReplyData
     reactions?: MessageReactionData[];
     images?: MediaMeta[];
@@ -16,11 +17,18 @@ export interface FileData {
 
 export interface ReplyData {
     id: string;
-    user: string;
+    userId: UserIdentity;
+}
+
+export interface UserIdentity {
+    name: string;
+    handle: string;
 }
 
 export interface UserMeta {
     username: string;
+    userHandle: string;
+    userCode: string;
     joinedAt: number;
     device: string;
 };
@@ -61,12 +69,12 @@ export interface DOMEvent {
 };
 
 export type MessageActionData =
-    | { type: "reply"; name: string; messageId: string }
+    | { type: "reply"; userId: UserIdentity; messageId: string }
     | { type: "edit"; messageId: string };
 
 export interface MessageReactionData {
     emoji: string;
-    users: string[];
+    userIds: string[];
 };
 
 export type MediaValidationResult =

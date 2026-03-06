@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
-import type { MessageData, UserMeta, SendPayload, SessionUserStatsMeta } from "../types/chat";
+import type { MessageData, UserMeta, SendPayload, SessionUserStatsMeta, UserIdentity } from "../types/chat";
 import { MAX_MESSAGE_REACTIONS } from "../constants/chat";
 import { LocalMessages } from "../data/localMessages";
 
@@ -11,7 +11,7 @@ export function useChat() {
     const userStats = useRef<Record<string, SessionUserStatsMeta>>({});
     const [userCount, setUserCount] = useState(0);
     const [connected, setConnected] = useState(false);
-    const [username, setUsername] = useState<string>("");
+    const [userId, setUserId] = useState<UserIdentity>();
     const [users, setUsers] = useState<UserMeta[]>([]);
     const [socket, setSocket] = useState<Socket<
         ServerToClientEvents,
@@ -37,9 +37,10 @@ export function useChat() {
             const newMap = new Map(prev);
             newMap.set(id, {
                 id,
-                user: "System",
+                user: { name: "System", handle: "System" },
                 text,
                 timestamp: Date.now(),
+                system: true,
             });
             return newMap;
         });
@@ -79,7 +80,7 @@ export function useChat() {
             const { id, user, text, timestamp, images, replyTo } = msg as MessageData;
 
             if (
-                typeof user !== "string" ||
+                typeof user !== "object" ||
                 typeof text !== "string" ||
                 typeof timestamp !== "number"
             ) return;
@@ -88,12 +89,12 @@ export function useChat() {
             if (
                 replyTo &&
                 typeof replyTo === "object" &&
-                typeof replyTo.id === "string" &&
-                typeof replyTo.user === "string"
+                typeof replyTo.id === "string" &&       // needed?
+                typeof replyTo.userId === "object"
             ) {
                 validatedReplyTo = {
                     id: replyTo.id,
-                    user: replyTo.user,
+                    userId: replyTo.userId,
                 };
             }
 
@@ -119,12 +120,11 @@ export function useChat() {
             setMessageOrder(prev => [...prev, id]);
 
             // update user's stats in stats map whenever a new message is sent
-            const oldStats = userStats.current[user] ?? { messageCount: 0, lastActive: 0 };
-            userStats.current[user] = {
+            const oldStats = userStats.current[user.handle] ?? { messageCount: 0, lastActive: 0 };
+            userStats.current[user.handle] = {
                 messageCount: oldStats.messageCount + 1,
                 lastActive: timestamp,
             };
-
         };
 
         const handleDeleteMessage = (messageId: string) => {
@@ -172,19 +172,19 @@ export function useChat() {
 
                 if (existingIndex !== -1) {
                     const existing = reactions[existingIndex];
-                    if (!existing.users.includes(user)) {
-                        reactions[existingIndex] = { ...existing, users: [...existing.users, user] };
+                    if (!existing.userIds.includes(user)) {
+                        reactions[existingIndex] = { ...existing, userIds: [...existing.userIds, user] };
                     } else {
-                        const newUsers = existing.users.filter(u => u !== user);
+                        const newUsers = existing.userIds.filter(u => u !== user);
                         if (newUsers.length === 0) {
                             reactions.splice(existingIndex, 1);
                         } else {
-                            reactions[existingIndex] = { ...existing, users: newUsers };
+                            reactions[existingIndex] = { ...existing, userIds: newUsers };
                         }
                     }
                 } else {
                     if (reactions.length >= MAX_MESSAGE_REACTIONS) return prev;
-                    reactions.push({ emoji, users: [user] });
+                    reactions.push({ emoji, userIds: [user] });
                 }
 
                 const newMap = new Map(prev);
@@ -194,9 +194,9 @@ export function useChat() {
         };
 
         socket.on("connect", () => setConnected(true));
-        socket.on("username", (name) => {
-            setUsername(name);
-            sendLocalSystemMessage(LocalMessages.welcome(name));
+        socket.on("user-confirm", (user) => {
+            setUserId(user);
+            sendLocalSystemMessage(LocalMessages.welcome(user.name));
         });
         socket.on("new-message", handleSendMessage);
         socket.on("delete-message-public", handleDeleteMessage);
@@ -234,7 +234,7 @@ export function useChat() {
             socket.off("delete-message-public", handleDeleteMessage);
             socket.off("active-connections", setUserCount);
             socket.off("users-update");
-            socket.off("username");
+            socket.off("user-confirm");
             socket.off("kicked");
             socket.off("warn-kick");
             socket.off("connect");
@@ -254,7 +254,7 @@ export function useChat() {
         userCount,
         userStats,
         users,
-        username,
+        userId,
         messages,
         messageOrder,
         startChat,
