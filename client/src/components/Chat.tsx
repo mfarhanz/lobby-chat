@@ -25,6 +25,8 @@ import { usePaste } from "../hooks/usePaste";
 import { UsernameModal } from "./UsernameModal";
 import { useInactivityCheck } from "../hooks/useInactivityCheck";
 import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult, UserIdentity } from "../types/chat";
+import { AnimatePresence, motion } from "motion/react";
+import { EmojiDrawer } from "./EmojiDrawer";
 
 export interface ChatProps {
     user: UserIdentity | undefined,
@@ -692,49 +694,52 @@ export const Chat = memo(function Chat({
             )}
 
             {/* Chat input emoji picker - mobile only */}
-            {TOUCH_DEVICE && showEmojiPicker && (
-                <Suspense fallback={<Spinner />}>
-                    <div className="flex justify-center mt-2 mb-2 animate-slide-up">
-                        <div className="w-screen rounded-t-2xl bg-zinc-900">
-                            <EmojiPicker
-                                onSelect={handleEmojiInputSelect}
-                                onClose={handleEmojiInputClose}
-                                navPosition="none"
-                            />
+            <AnimatePresence>
+                {TOUCH_DEVICE && showEmojiPicker && (
+                    <Suspense fallback={<Spinner />}>
+                        <div className="relative overflow-hidden rounded-t-2xl bg-zinc-900 shadow-xl mt-2 h-50 w-full">
+                            <motion.div
+                                drag="y"
+                                dragConstraints={{ top: -180, bottom: 0 }}
+                                dragElastic={0.08}
+                                initial={{ y: 120 }}
+                                animate={{ y: 0 }}
+                                exit={{
+                                    y: "200%",
+                                    transition: { duration: 0.4, ease: "easeOut" }
+                                }}
+                                transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                            >
+                                <EmojiPicker
+                                    onSelect={handleEmojiInputSelect}
+                                    onClose={handleEmojiInputClose}
+                                    navPosition="none"
+                                />
+                            </motion.div>
                         </div>
-                    </div>
-                </Suspense>
-            )}
+                    </Suspense>
+                )}
+            </AnimatePresence>
 
-            {/* Message Actions - for touchscreen only */}
-            <Drawer
-                open={!!drawerMessage}
-                actions={drawerActions}
-                onClose={handleCloseDrawer}
-            />
+            {/* Message Actions Drawer - for touchscreen only */}
+            <AnimatePresence>
+                {!!drawerMessage && (
+                    <Drawer
+                        actions={drawerActions}
+                        onClose={handleCloseDrawer}
+                    />
+                )}
+            </AnimatePresence>
 
             {/* Drawer Emoji Picker - for reactions on touchscreen only*/}
-            {TOUCH_DEVICE && emojiPickerOpenId && (
-                <Suspense fallback={<Spinner />}>
-                    <>
-                        {/* Backdrop */}
-                        <div
-                            className="fixed inset-0 z-40 bg-black/40"
-                            onClick={() => setEmojiPickerOpenId(null)}
-                        />
-
-                        {/* Drawer */}
-                        <div className="fixed bottom-0 left-0 right-0 z-50 rounded-t-2xl bg-zinc-900 p-4 animate-slide-up">
-                            <EmojiPicker
-                                onSelect={handleEmojiReactionSelect}
-                                onClose={handleEmojiReactionClose}
-                                className="w-full"
-                                navPosition="none"
-                            />
-                        </div>
-                    </>
-                </Suspense>
-            )}
+            <AnimatePresence>
+                {TOUCH_DEVICE && emojiPickerOpenId && (
+                    <EmojiDrawer
+                        onClose={handleEmojiReactionClose}
+                        onSelect={handleEmojiReactionSelect}
+                    />
+                )}
+            </AnimatePresence>
         </section>
     );
 }, (prev, next) => {  // additional strict comparator rule to only rerender the chat if messages state has changed and on socket connection
