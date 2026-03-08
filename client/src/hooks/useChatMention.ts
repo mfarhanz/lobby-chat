@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { autoResize } from "../utils/textarea";
+import { TOUCH_DEVICE } from "../utils/device";
 
 interface UseChatMentionProps {
     users: string[];
@@ -71,8 +72,10 @@ export function useChatMention({ users, input, setInput, textareaRef }: UseChatM
                 selectSuggestion(suggestions[highlightedIndex]);
             }
         } else if (e.key === "Enter" && !e.shiftKey) {
-            e.preventDefault();
-            onSubmit();
+            if (!TOUCH_DEVICE) {
+                e.preventDefault();
+                onSubmit();
+            }
         }
     }, [suggestions, selectSuggestion, showSuggestions, highlightedIndex, setHighlightedIndex]);
 

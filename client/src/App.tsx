@@ -34,13 +34,11 @@ export default function App() {
         if (!usersOpen) return;
 
         window.history.pushState({ usersPanel: true }, "");
-
         const onPopState = () => {
             setUsersOpen(false);
         };
 
         window.addEventListener("popstate", onPopState);
-
         return () => {
             window.removeEventListener("popstate", onPopState);
         };

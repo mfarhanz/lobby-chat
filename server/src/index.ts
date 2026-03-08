@@ -12,6 +12,7 @@ const allowedOrigins = [
     "http://localhost:5173",           // local vite dev frontend
     "https://lobbychat.pages.dev",     // Cloudflare Pages deployed client
     "https://chat.mfarhanz.dev",       // additional subdomain of mine
+    "http://192.168.2.12:5173"          // local LAN vite frontend
 ];
 
 const app = express();

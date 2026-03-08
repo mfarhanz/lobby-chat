@@ -27,6 +27,8 @@ import { useInactivityCheck } from "../hooks/useInactivityCheck";
 import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult, UserIdentity } from "../types/chat";
 import { AnimatePresence, motion } from "motion/react";
 import { EmojiDrawer } from "./EmojiDrawer";
+import { SendIcon } from "./icons/SendIcon";
+import { KeyboardIcon } from "./icons/KeyboardIcon";
 
 export interface ChatProps {
     user: UserIdentity | undefined,
@@ -137,12 +139,22 @@ export const Chat = memo(function Chat({
         return () => URL.revokeObjectURL(embed);
     }, [embed]);
 
-    useEffect(() => {
+    useEffect(() => {                                           // for reverting to copyicon from checkicon on copying message
         return () => {
             if (copyTimeoutRef.current) {
                 clearTimeout(copyTimeoutRef.current);
             }
         };
+    }, []);
+
+    useEffect(() => {                                           // catch pull to refresh/reload event to confirm
+        const handler = (e: BeforeUnloadEvent) => {
+            e.preventDefault();
+            e.returnValue = "";
+        };
+
+        window.addEventListener("beforeunload", handler);
+        return () => window.removeEventListener("beforeunload", handler);
     }, []);
 
     const scrollToListEndSmooth = useCallback(() => {
@@ -263,9 +275,9 @@ export const Chat = memo(function Chat({
         // reset local states
         setEmbed(null);
         setUploads([]);
-        // reset textarea height
-        if (textareaRef.current) textareaRef.current.style.height = "auto";
-    }, [handleSend, setEmbed, setUploads]);
+        textareaRef.current.style.height = "auto";  // reset textarea height
+        if (!showEmojiPicker) textareaRef.current.focus();  // keep textarea focused only if emoji drawer not open
+    }, [handleSend, showEmojiPicker, setEmbed, setUploads]);
 
     const pasteCallback = useCallback((result: PasteResult) => {
         if (result) {
@@ -364,6 +376,7 @@ export const Chat = memo(function Chat({
 
     const handleEmojiInputClose = useCallback(() => {
         setShowEmojiPicker(false);
+        if (window.history.state?.emojiDrawer) window.history.back();
     }, []);
 
     const handleEmojiReactionSelect = useCallback((emoji: string) => {
@@ -377,6 +390,15 @@ export const Chat = memo(function Chat({
         setEmojiPickerOpenId(null)
     }, []);
 
+    const handleEmojiButtonToggle = useCallback(() => {
+        setTimeout(() => setShowEmojiPicker(v => !v), 100);
+        if (showEmojiPicker) {
+            setTimeout(() => textareaRef.current?.focus(), 120);
+            window.history.pushState({ emojiDrawer: true }, "");
+        }
+        else textareaRef.current?.blur();
+    }, [showEmojiPicker]);
+
     const handleCloseDrawer = useCallback(() => {
         setDrawerMessage(null);
     }, []);
@@ -385,6 +407,15 @@ export const Chat = memo(function Chat({
         submitUsername(name);
         setUsernameSubmitted(true);
     }, [submitUsername]);
+
+    useEffect(() => {                                       // called when clicking the back button from open emoji drawer
+        const handlePopState = () => {
+            if (showEmojiPicker) handleEmojiInputClose();
+        };
+
+        window.addEventListener("popstate", handlePopState);
+        return () => window.removeEventListener("popstate", handlePopState);
+    }, [showEmojiPicker, handleEmojiInputClose]);
 
     const onLongPress = useCallback((msg: MessageData) => {
         if (TOUCH_DEVICE) setDrawerMessage(msg);
@@ -614,12 +645,16 @@ export const Chat = memo(function Chat({
 
                     {/* Chat Input */}
                     <textarea
+                        data-chat-input
                         ref={textareaRef}
                         className="chat-input"
                         value={input}
                         disabled={!connected}
                         placeholder="Type a message..."
                         rows={1}
+                        onClick={() => {
+                            if (showEmojiPicker) handleEmojiInputClose();
+                        }}
                         onChange={handleInputChange}
                         onKeyDown={(e) => handleKeyDown(e, onSend)}
                         onPaste={handlePaste}
@@ -652,16 +687,18 @@ export const Chat = memo(function Chat({
                     {/* Chat Input buttons */}
                     <div className="chat-input-btn-group">
                         <IconButton
-                            icon={<EmojiIcon />}
-                            title="Emojis"
-                            className="px-2"
-                            onClick={() => setShowEmojiPicker((v) => !v)}
+                            data-emoji-toggle
+                            icon={showEmojiPicker ? <KeyboardIcon /> : <EmojiIcon />}
+                            title={showEmojiPicker ? "Keyboard" : "Emojis"}
+                            className="sm:px-2"
+                            onClick={handleEmojiButtonToggle}
                         />
 
                         <IconButton
+                            data-upload-image
                             icon={<ImageIcon />}
                             title="Attach Media"
-                            className="px-2"
+                            className="pl-2 sm:px-2"
                             disabled={!!embed}
                             onClick={() => fileInputRef.current?.click()}
                         />
@@ -669,11 +706,12 @@ export const Chat = memo(function Chat({
                 </div>
 
                 <button
+                    data-chat-send
                     className="chat-send"
                     disabled={!connected}
                     onClick={onSend}
                 >
-                    ➤
+                    <SendIcon />
                 </button>
             </div>
 
@@ -697,18 +735,14 @@ export const Chat = memo(function Chat({
             <AnimatePresence>
                 {TOUCH_DEVICE && showEmojiPicker && (
                     <Suspense fallback={<Spinner />}>
-                        <div className="relative overflow-hidden rounded-t-2xl bg-zinc-900 shadow-xl mt-2 h-50 w-full">
+                        <div className="relative overflow-hidden rounded-t-2xl bg-zinc-900 shadow-xl mt-4 h-60 w-full z-50">
                             <motion.div
                                 drag="y"
                                 dragConstraints={{ top: -180, bottom: 0 }}
                                 dragElastic={0.08}
                                 initial={{ y: 120 }}
                                 animate={{ y: 0 }}
-                                exit={{
-                                    y: "200%",
-                                    transition: { duration: 0.4, ease: "easeOut" }
-                                }}
-                                transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                                transition={{ type: "spring", stiffness: 600, damping: 35 }}
                             >
                                 <EmojiPicker
                                     onSelect={handleEmojiInputSelect}
