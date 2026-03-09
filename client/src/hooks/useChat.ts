@@ -50,6 +50,7 @@ export function useChat() {
     const sendMessage = useCallback((payload: SendPayload) => {
         const hasText = payload.text.trim().length > 0;
         const hasImages = !!payload.images?.length;
+        console.log(payload);
         if (!hasText && !hasImages) return;
         socket?.emit("send-message", payload);
     }, [socket]);

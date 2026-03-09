@@ -138,13 +138,13 @@ export const Chat = memo(function Chat({
         return () => URL.revokeObjectURL(embed);
     }, [embed]);
 
-    // useEffect(() => {                                           // for reverting to copyicon from checkicon on copying message
-    //     return () => {
-    //         if (copyTimeoutRef.current) {
-    //             clearTimeout(copyTimeoutRef.current);
-    //         }
-    //     };
-    // }, []);
+    useEffect(() => {                                           // for reverting to copyicon from checkicon on copying message
+        return () => {
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {                                           // catch pull to refresh/reload event to confirm
         const handler = (e: BeforeUnloadEvent) => {
@@ -432,12 +432,12 @@ export const Chat = memo(function Chat({
         navigator.clipboard.writeText(m.text);
         if (!TOUCH_DEVICE) {
             setCopydId(m.id);
-            // if (copyTimeoutRef.current) {
-            //     clearTimeout(copyTimeoutRef.current);
-            // }
-            // copyTimeoutRef.current = window.setTimeout(() => {
-            //     setCopydId(null);
-            // }, 2000);
+            if (copyTimeoutRef.current) {
+                clearTimeout(copyTimeoutRef.current);
+            }
+            copyTimeoutRef.current = window.setTimeout(() => {
+                setCopydId(null);
+            }, 2000);
         }
     }, []);
 
