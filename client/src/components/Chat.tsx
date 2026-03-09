@@ -106,7 +106,6 @@ export const Chat = memo(function Chat({
     const {
         suggestions,
         showSuggestions,
-        highlightedIndex,
         selectSuggestion,
         handleInputChange,
         handleKeyDown,
@@ -139,13 +138,13 @@ export const Chat = memo(function Chat({
         return () => URL.revokeObjectURL(embed);
     }, [embed]);
 
-    useEffect(() => {                                           // for reverting to copyicon from checkicon on copying message
-        return () => {
-            if (copyTimeoutRef.current) {
-                clearTimeout(copyTimeoutRef.current);
-            }
-        };
-    }, []);
+    // useEffect(() => {                                           // for reverting to copyicon from checkicon on copying message
+    //     return () => {
+    //         if (copyTimeoutRef.current) {
+    //             clearTimeout(copyTimeoutRef.current);
+    //         }
+    //     };
+    // }, []);
 
     useEffect(() => {                                           // catch pull to refresh/reload event to confirm
         const handler = (e: BeforeUnloadEvent) => {
@@ -379,6 +378,26 @@ export const Chat = memo(function Chat({
         if (window.history.state?.emojiDrawer) window.history.back();
     }, []);
 
+    const handleEmojiButtonToggle = useCallback(() => {
+        setTimeout(() => setShowEmojiPicker(v => !v), 100);
+        if (showEmojiPicker) {
+            setTimeout(() => textareaRef.current?.focus(), 120);
+            if (!window.history.state?.emojiDrawer) {
+                window.history.pushState({ emojiDrawer: true }, "");
+            }
+        }
+        else textareaRef.current?.blur();
+    }, [showEmojiPicker]);
+
+    useEffect(() => {                                       // called when clicking the back button from open emoji drawer
+        const handlePopState = () => {
+            if (showEmojiPicker) handleEmojiInputClose();
+        };
+
+        window.addEventListener("popstate", handlePopState);
+        return () => window.removeEventListener("popstate", handlePopState);
+    }, [showEmojiPicker, handleEmojiInputClose]);
+
     const handleEmojiReactionSelect = useCallback((emoji: string) => {
         if (emojiPickerOpenId) {
             addReaction(emojiPickerOpenId, emoji);
@@ -390,15 +409,6 @@ export const Chat = memo(function Chat({
         setEmojiPickerOpenId(null)
     }, []);
 
-    const handleEmojiButtonToggle = useCallback(() => {
-        setTimeout(() => setShowEmojiPicker(v => !v), 100);
-        if (showEmojiPicker) {
-            setTimeout(() => textareaRef.current?.focus(), 120);
-            window.history.pushState({ emojiDrawer: true }, "");
-        }
-        else textareaRef.current?.blur();
-    }, [showEmojiPicker]);
-
     const handleCloseDrawer = useCallback(() => {
         setDrawerMessage(null);
     }, []);
@@ -407,15 +417,6 @@ export const Chat = memo(function Chat({
         submitUsername(name);
         setUsernameSubmitted(true);
     }, [submitUsername]);
-
-    useEffect(() => {                                       // called when clicking the back button from open emoji drawer
-        const handlePopState = () => {
-            if (showEmojiPicker) handleEmojiInputClose();
-        };
-
-        window.addEventListener("popstate", handlePopState);
-        return () => window.removeEventListener("popstate", handlePopState);
-    }, [showEmojiPicker, handleEmojiInputClose]);
 
     const onLongPress = useCallback((msg: MessageData) => {
         if (TOUCH_DEVICE) setDrawerMessage(msg);
@@ -431,12 +432,12 @@ export const Chat = memo(function Chat({
         navigator.clipboard.writeText(m.text);
         if (!TOUCH_DEVICE) {
             setCopydId(m.id);
-            if (copyTimeoutRef.current) {
-                clearTimeout(copyTimeoutRef.current);
-            }
-            copyTimeoutRef.current = window.setTimeout(() => {
-                setCopydId(null);
-            }, 2000);
+            // if (copyTimeoutRef.current) {
+            //     clearTimeout(copyTimeoutRef.current);
+            // }
+            // copyTimeoutRef.current = window.setTimeout(() => {
+            //     setCopydId(null);
+            // }, 2000);
         }
     }, []);
 
@@ -626,12 +627,10 @@ export const Chat = memo(function Chat({
                     {/* Chat input ping suggestions */}
                     {showSuggestions && suggestions.length > 0 && (
                         <ul className="chat-message-mention-list hide-scrollbar">
-                            {suggestions.map((u, i) => (
+                            {suggestions.map((u) => (
                                 <li
                                     key={u}
-                                    className={`px-4 py-2 text-mention-sm cursor-pointer 
-                                                ${i === highlightedIndex ? "bg-zinc-700/30" : ""} 
-                                                hover:bg-zinc-700/30`}
+                                    className={`px-4 py-2 text-mention-sm cursor-pointer hover:bg-zinc-700/30`}
                                     onMouseDown={(e) => {
                                         e.preventDefault();
                                         selectSuggestion(u);
@@ -705,14 +704,14 @@ export const Chat = memo(function Chat({
                     </div>
                 </div>
 
-                <button
+                <IconButton
                     data-chat-send
+                    icon={<SendIcon />}
+                    title="Send"
                     className="chat-send"
                     disabled={!connected}
                     onClick={onSend}
-                >
-                    <SendIcon />
-                </button>
+                />
             </div>
 
             {/* Image View Popup - on clicking any media */}

@@ -12,7 +12,7 @@ interface UseChatMentionProps {
 export function useChatMention({ users, input, setInput, textareaRef }: UseChatMentionProps) {
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
-    const [highlightedIndex, setHighlightedIndex] = useState(0);
+    const [chosenIndex, setChosenIndex] = useState(0);
 
     const selectSuggestion = useCallback((username: string) => {
         if (!textareaRef.current) return;
@@ -52,24 +52,18 @@ export function useChatMention({ users, input, setInput, textareaRef }: UseChatM
             const filtered = users.filter(u => u.toLowerCase().startsWith(query));
             setSuggestions(filtered);
             setShowSuggestions(filtered.length > 0);
-            setHighlightedIndex(0);
+            setChosenIndex(0);
         } else {
             setShowSuggestions(false);
             setSuggestions([]);
         }
-    }, [users, setInput, setSuggestions, setShowSuggestions, setHighlightedIndex]);
+    }, [users, setInput, setSuggestions, setShowSuggestions, setChosenIndex]);
 
     const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>, onSubmit: () => void) => {
         if (showSuggestions && suggestions.length > 0) {
-            if (e.key === "ArrowDown") {
+            if (e.key === "Enter" || e.key === "Tab") {
                 e.preventDefault();
-                setHighlightedIndex((i) => (i + 1) % suggestions.length);
-            } else if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setHighlightedIndex((i) => (i === 0 ? suggestions.length - 1 : i - 1));
-            } else if (e.key === "Enter" || e.key === "Tab") {
-                e.preventDefault();
-                selectSuggestion(suggestions[highlightedIndex]);
+                selectSuggestion(suggestions[chosenIndex]);
             }
         } else if (e.key === "Enter" && !e.shiftKey) {
             if (!TOUCH_DEVICE) {
@@ -77,12 +71,11 @@ export function useChatMention({ users, input, setInput, textareaRef }: UseChatM
                 onSubmit();
             }
         }
-    }, [suggestions, selectSuggestion, showSuggestions, highlightedIndex, setHighlightedIndex]);
+    }, [suggestions, selectSuggestion, showSuggestions, chosenIndex]);
 
     return {
         suggestions,
         showSuggestions,
-        highlightedIndex,
         selectSuggestion,
         handleInputChange,
         handleKeyDown,

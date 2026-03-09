@@ -51,8 +51,8 @@ export default memo(function EmojiPicker({ onSelect, onClose, className = "", ..
 
     // close when clicking outside
     useEffect(() => {
-        document.addEventListener("pointerdown", handleClickOutside);
-        return () => document.removeEventListener("pointerdown", handleClickOutside);
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [handleClickOutside]);
 
     return (

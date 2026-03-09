@@ -102,7 +102,7 @@ body {
   }
 
   .app-header {
-    @apply px-6 py-4 text-2xl font-semibold tracking-tight;
+    @apply px-6 py-4 text-2xl font-semibold tracking-tight select-none;
   }
 
   .app-main {
@@ -115,7 +115,8 @@ body {
   }
 
   .users-panel {
-    @apply flex flex-col w-64 sm:bg-zinc-800/70 bg-zinc-800/95 rounded-xl p-4 space-y-2;
+    @apply flex flex-col w-64 sm:bg-zinc-800/70 bg-zinc-800/95 p-4 space-y-2;
+    @apply rounded-l-xl rounded-r-none sm:rounded-xl;
     @apply transition-transform duration-300 ease-out;
   }
 
@@ -152,6 +153,7 @@ body {
 
   .chat-message {
     @apply relative rounded-md px-3 py-1.5;
+    @apply select-none lg:select-auto;
     @apply bg-transparent;
   }
 
@@ -351,15 +353,22 @@ body {
     @apply bg-indigo-600 text-white;
     @apply border-none outline-none ring-0 cursor-pointer;
     @apply transition-colors;
-    @apply active:translate-x-0.5;
   }
 
-  .chat-send:hover:not(:disabled) {
-    @apply lg:bg-purple-800/70;
+  .chat-send:hover:disabled {
+    @apply bg-indigo-600;
   }
 
   .chat-send:disabled {
     @apply opacity-50 cursor-not-allowed;
+  }
+
+  .chat-send:active:not(:disabled) {
+    @apply translate-x-0.5;
+  }
+
+  .chat-send:hover:not(:disabled) {
+    @apply lg:bg-purple-800/70;
   }
 
   .chat-action-bar {
@@ -375,8 +384,8 @@ body {
   }
 
   .reply-indicator {
-    @apply inline-flex relative items-baseline self-start whitespace-nowrap;
-    @apply mb-1 ml-1 gap-1 max-w-[80%] pl-5 pr-2 py-0.5 text-[11px] rounded-md;
+    @apply relative items-baseline self-start truncate;
+    @apply mb-1 ml-1 pl-5 pr-2 py-0.5 text-[11px] rounded-md;
     @apply text-zinc-300 bg-transparent;
   }
 

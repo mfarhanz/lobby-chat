@@ -36,7 +36,7 @@ export const EmojiDrawer = memo(function EmojiDrawer({
                         }
                     }}
                     initial={{ y: "80%" }}
-                    animate={{ y: "60%" }}
+                    animate={{ y: "58.7%" }}
                     exit={{ y: "100%" }}
                     transition={{ type: "spring", stiffness: 420, damping: 35 }}
                     className="fixed bottom-0 left-0 right-0 z-50 p-4 pb-30 

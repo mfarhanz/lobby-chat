@@ -1,5 +1,5 @@
 import "./App.css";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat } from "./components/Chat";
 import { UsersPanel } from "./components/UsersPanel";
 import { TurnstileOverlay } from "./components/TurnstileOverlay";
@@ -24,26 +24,32 @@ export default function App() {
     } = useChat();
 
     const [usersOpen, setUsersOpen] = useState(false);
+    const historyRef = useRef(false);
 
-    const usernames = useMemo(          // needed?
+    const usernames = useMemo(
         () => users.map(u => u.username),
         [users]
     );
 
     useEffect(() => {
-        if (!usersOpen) return;
-
-        window.history.pushState({ usersPanel: true }, "");
         const onPopState = () => {
-            setUsersOpen(false);
+            if (historyRef.current) {
+                setUsersOpen(false);
+                historyRef.current = false;
+            }
         };
 
         window.addEventListener("popstate", onPopState);
-        return () => {
-            window.removeEventListener("popstate", onPopState);
-        };
-    }, [usersOpen]);
+        return () => window.removeEventListener("popstate", onPopState);
+    }, []);
 
+    const openUsersPanel = useCallback(() => {
+        if (!historyRef.current) {
+            window.history.pushState({ usersPanel: true }, "");
+            historyRef.current = true;
+        }
+        setUsersOpen(true);
+    }, []);
 
     return (
         <div className="app-shell">
@@ -51,7 +57,7 @@ export default function App() {
 
             <header
                 className="app-header text-title"
-                onClick={() => setUsersOpen(prev => !prev)}
+                onClick={openUsersPanel}
             >
                 Live Chat
             </header>

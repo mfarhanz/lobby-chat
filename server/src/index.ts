@@ -75,15 +75,15 @@ chat.use(async (socket: Socket & { _ip?: string }, next) => {
         if (!data.success) {
             let msg = `${SV.CF_FAILED}`;
             if (data["error-codes"]?.includes("timeout-or-duplicate")) {
-                msg = `${SV.CF_EXPIRED}: ${SV.CLIENT_RELOAD}.`;
+                msg = `${SV.CF_EXPIRED}: ${SV.CLIENT_RELOAD}`;
             } else if (data["error-codes"]?.includes("invalid-input-response")) {
-                msg = `${SV.CF_INVALID}: ${SV.CLIENT_RELOAD}.`;
+                msg = `${SV.CF_INVALID}: ${SV.CLIENT_RELOAD}`;
             } else if (data["error-codes"]?.includes("missing-input-response")) {
-                msg = `${SV.CF_MISSING}: ${SV.CLIENT_UNEXPECTED}.`;
+                msg = `${SV.CF_MISSING}: ${SV.CLIENT_UNEXPECTED}`;
             } else if (data["error-codes"]?.includes("bad-request")) {
-                msg = `${SV.CF_BAD_REQUEST}: ${SV.CLIENT_RELOAD}.`;
+                msg = `${SV.CF_BAD_REQUEST}: ${SV.CLIENT_RELOAD}`;
             } else if (data["error-codes"]?.includes("internal-error")) {
-                msg = `${SV.CF_ERROR}: ${SV.CLIENT_RELOAD_LATER}.`;
+                msg = `${SV.CF_ERROR}: ${SV.CLIENT_RELOAD_LATER}`;
             }
             return next(new Error(msg));
         }

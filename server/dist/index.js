@@ -48,6 +48,7 @@ const allowedOrigins = [
     "http://localhost:5173", // local vite dev frontend
     "https://lobbychat.pages.dev", // Cloudflare Pages deployed client
     "https://chat.mfarhanz.dev", // additional subdomain of mine
+    "http://192.168.2.12:5173" // local LAN vite frontend
 ];
 const app = (0, express_1.default)();
 app.set("trust proxy", true);
@@ -100,19 +101,19 @@ chat.use(async (socket, next) => {
         if (!data.success) {
             let msg = `${constants_1.SERVER_MESSAGES.CF_FAILED}`;
             if (data["error-codes"]?.includes("timeout-or-duplicate")) {
-                msg = `${constants_1.SERVER_MESSAGES.CF_EXPIRED}: ${constants_1.SERVER_MESSAGES.CLIENT_RELOAD}.`;
+                msg = `${constants_1.SERVER_MESSAGES.CF_EXPIRED}: ${constants_1.SERVER_MESSAGES.CLIENT_RELOAD}`;
             }
             else if (data["error-codes"]?.includes("invalid-input-response")) {
-                msg = `${constants_1.SERVER_MESSAGES.CF_INVALID}: ${constants_1.SERVER_MESSAGES.CLIENT_RELOAD}.`;
+                msg = `${constants_1.SERVER_MESSAGES.CF_INVALID}: ${constants_1.SERVER_MESSAGES.CLIENT_RELOAD}`;
             }
             else if (data["error-codes"]?.includes("missing-input-response")) {
-                msg = `${constants_1.SERVER_MESSAGES.CF_MISSING}: ${constants_1.SERVER_MESSAGES.CLIENT_UNEXPECTED}.`;
+                msg = `${constants_1.SERVER_MESSAGES.CF_MISSING}: ${constants_1.SERVER_MESSAGES.CLIENT_UNEXPECTED}`;
             }
             else if (data["error-codes"]?.includes("bad-request")) {
-                msg = `${constants_1.SERVER_MESSAGES.CF_BAD_REQUEST}: ${constants_1.SERVER_MESSAGES.CLIENT_RELOAD}.`;
+                msg = `${constants_1.SERVER_MESSAGES.CF_BAD_REQUEST}: ${constants_1.SERVER_MESSAGES.CLIENT_RELOAD}`;
             }
             else if (data["error-codes"]?.includes("internal-error")) {
-                msg = `${constants_1.SERVER_MESSAGES.CF_ERROR}: ${constants_1.SERVER_MESSAGES.CLIENT_RELOAD_LATER}.`;
+                msg = `${constants_1.SERVER_MESSAGES.CF_ERROR}: ${constants_1.SERVER_MESSAGES.CLIENT_RELOAD_LATER}`;
             }
             return next(new Error(msg));
         }

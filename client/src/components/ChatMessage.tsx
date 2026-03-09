@@ -101,7 +101,7 @@ export const ChatMessage = memo(function ChatMessage({
     return (
         <div
             // TODO: fix pinging users with the same username
-            className={`chat-message text-message 
+            className={`chat-message text-message
                         ${msg.user.handle === user.handle ? "chat-message-self" : ""}
                         ${(msg.replyTo?.userId.handle === user.handle || msg.text.includes(`@${user.name}`)) ? "chat-message-ping" : ""}
                         `}
@@ -116,7 +116,7 @@ export const ChatMessage = memo(function ChatMessage({
                     >
                         {replyingTo ? (
                             <>
-                                <span className="text-mention-xs">{msg.replyTo.userId.name}</span>
+                                <span className="text-mention-xs mr-1">{msg.replyTo.userId.name}</span>
                                 {replyingTo.text.length > 75
                                     ? replyingTo.text.slice(0, 75) + " ..."
                                     : replyingTo.text}
@@ -124,7 +124,6 @@ export const ChatMessage = memo(function ChatMessage({
                         ) : (
                             <span className="italic ml-1">message deleted</span>
                         )}
-
                     </div>
                 </div>
             )}

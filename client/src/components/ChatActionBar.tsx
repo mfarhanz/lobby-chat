@@ -1,3 +1,4 @@
+import { IconButton } from "./IconButton";
 import { CancelIcon } from "./icons/CancelIcon";
 
 interface ChatActionBarProps {
@@ -9,24 +10,25 @@ interface ChatActionBarProps {
 export function ChatActionBar({ type, name, onClose }: ChatActionBarProps) {
     return (
         <div className="chat-action-bar">
-            {type === "reply" ? (
-                <span>
-                    Replying to
-                    <span className="text-mention-sm">
-                        {name ?? "Anonymous"}
-                    </span>
-                </span>
-            ) : (
-                "Editing message"
-            )}
+            <span className="min-w-0 truncate">
+                {type === "reply" ? (
+                    <>
+                        Replying to{" "}
+                        <span className="text-mention-sm">
+                            {name ?? "Anonymous"}
+                        </span>
+                    </>
+                ) : (
+                    "Editing message"
+                )}
+            </span>
 
-            <button
-                className="chat-action-bar-close floating-action-btn mb-1"
+            <IconButton
+                icon={<CancelIcon className="size-5" />}
+                title={"Cancel"}
+                className="text-xs mb-1 shrink-0"
                 onClick={onClose}
-                title="Cancel"
-            >
-                <CancelIcon className="size-5" />
-            </button>
+            />
         </div>
     );
 }
