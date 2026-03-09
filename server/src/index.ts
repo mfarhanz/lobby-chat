@@ -250,15 +250,6 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
         user.messagesToday++;
         totalMessagesToday++;
 
-        console.log({
-            id: messageId,
-            user: { name: user.username, handle: user.userHandle },
-            text,
-            timestamp: now,
-            images: validatedImages,
-            replyTo: validatedReplyTo,
-        });
-
         // Send/broadcast message to everyone
         chat.emit("new-message", {
             id: messageId,
