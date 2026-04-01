@@ -1,7 +1,9 @@
-import { memo, Suspense } from "react";
+import { memo, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Spinner } from "./Spinner";
-import EmojiPicker from "./EmojiPicker";
+// import EmojiPicker from "./EmojiPicker";
+
+const EmojiPicker = lazy(() => import("./EmojiPicker"));
 
 interface EmojiDrawerProps {
     onClose: () => void;

@@ -7,7 +7,7 @@ export function useChatUpload() {
 
     const cleanupPreviewUrls = useCallback(() => {
         uploadsRef.current.forEach(({ url }) => {
-            URL.revokeObjectURL(url);
+            if (url) URL.revokeObjectURL(url);
         });
     }, []);
 
