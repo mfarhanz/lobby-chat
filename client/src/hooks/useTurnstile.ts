@@ -14,7 +14,7 @@ export function useTurnstile(startChat: (username?: string, token?: string) => v
             if (window.turnstile) {
                 // @ts-expect-error injected by CF script
                 window.turnstile.render("#turnstile-container", {
-                    sitekey: "0x4AAAAAACJ_0HK2dEtgp0S_",
+                    sitekey: import.meta.env.VITE_TURNSTILE_SITEKEY,
                     size: "normal",
                     theme: "light",
                     callback: (t: string) => {

@@ -1,6 +1,7 @@
-import type { MessageData, UserMeta, UserIdentity, SendPayload } from "./chat";
+import type { MessageData, UserMeta, UserIdentity, SendPayload, SendIntentPayload, UploadAuthorization } from "./chat";
 
 export interface ServerToClientEvents {
+    "send-approval": (data: UploadAuthorization) => void;
     "new-message": (msg: MessageData) => void;
     "delete-message-public": (msgId: string) => void;
     "edit-message": (payload: {
@@ -18,10 +19,12 @@ export interface ServerToClientEvents {
     "kicked": (reason?: string) => void;
     "warn-kick": () => void;
     "server-limit": (downtime: number) => void;
+    "server-image-limit": () => void;
     "image-limit": () => void;
 }
 
 export interface ClientToServerEvents {
+    "send-intent": (payload: SendIntentPayload) => void;
     "send-message": (msg: SendPayload) => void;
     "delete-message": (msgId: string) => void;
     "edit-message": (payload: {

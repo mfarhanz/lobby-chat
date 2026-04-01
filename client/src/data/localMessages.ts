@@ -26,6 +26,7 @@ Have fun! 😄
     disconnected: () => "You have been disconnected.",
     connection_error: (error: string) => `Error connecting to chat: **${error}**`,
     image_limit: () => "_You have reached the daily limit for sending media files. You can still send text messages._",
+    server_image_limit: () => "_The server is unable to process media files at the moment. You can still send text messages._",
     server_limit: (downtime: number) => `_The chat server has reached its daily message limit. 
             To conserve costs, the chat is temporarily unavailable until the server comes back online in ${downtime} hour${downtime !== 1 ? "s" : ""}._`
 }

@@ -1,11 +1,13 @@
 import { TrashIcon } from "./icons/TrashIcon";
+import { SkeletonImage } from "./SkeletonImage";
 
 interface ThumbnailProps {
-    src: string;
+    src?: string;
+    progress?: number;
     onRemove: () => void;
 };
 
-export function Thumbnail({ src, onRemove }: ThumbnailProps) {
+export function Thumbnail({ src, progress, onRemove }: ThumbnailProps) {
     return (
         <div className="relative bottom-full left-3 -mb-px
                     flex items-center gap-2
@@ -14,13 +16,16 @@ export function Thumbnail({ src, onRemove }: ThumbnailProps) {
                     rounded-t-md rounded-b-none
                     text-xs text-zinc-300
                     shadow-sm">
-            <img
+
+            <SkeletonImage
                 src={src}
                 alt=""
                 loading="lazy"
-                decoding="async"
+                animated={false}
+                progress={progress}
                 className="w-[20vw] h-[20vw] max-h-25 max-w-25 object-cover rounded-sm bg-zinc-900"
             />
+
             <button
                 onClick={onRemove}
                 className="ml-1 text-red-500/60 hover:text-red-400 transition-colors cursor-pointer"

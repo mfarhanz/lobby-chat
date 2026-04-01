@@ -1,0 +1,63 @@
+/* TODO */
+
+:root {
+  --bg-primary: #0f172a;
+  --fg-primary: #0f172a;
+  --scrollbar-primary: #0f172a;
+  --scrollbar-secondary: #0f172a;
+  --bg-scrollbar-track: #0f172a;
+  --bg-scrollbar-thumb: #0f172a;
+  --bg-scrollbar-thumb: #0f172a;
+  --bg-chat-panel: #0f172a;
+  --bg-users-panel: #0f172a;
+  --bg-users-panel-sm: #0f172a;
+  --fg-user-item: #0f172a;
+  --bg-user-item: #0f172a;
+  --bg-user-item-hover: #0f172a;
+  --bg-chat-messages: #0f172a;
+  --bg-chat-message-hover: #0f172a;
+  --fg-chat-message-username: #0f172a;
+  --fg-chat-message-username-admin: #0f172a;
+  --bg-chat-message-username-admin: #0f172a;
+  --fg-chat-message-self: #0f172a;
+  --bg-chat-message-ping: #0f172a;
+  --fg-chat-message-time: #0f172a;
+  --fg-chat-message-edited: #0f172a;
+  --bg-chat-message-mention-list: #0f172a;
+  --border-chat-message-mention-list: #0f172a;
+  --fg-chat-message-text: #0f172a;
+  --fg-chat-message-blockquote: #0f172a;
+  --border-chat-message-table: #0f172a;
+  --bg-chat-message-thead: #0f172a;
+  --fg-chat-message-thead: #0f172a;
+  --bg-chat-message-tbody-odd: #0f172a;
+  --bg-chat-message-tbody-even: #0f172a;
+  --fg-chat-message-tbody: #0f172a;
+  --pl-chat-input: #0f172a;
+  --bg-chat-input: #0f172a;
+  --fg-icon-btn: #0f172a;
+  --fg-icon-btn-hover: #0f172a;
+  --bg-icon-btn-hover: #0f172a;
+  --fg-chat-send: #0f172a;
+  --bg-chat-send: #0f172a;
+  --bg-chat-send-hover: #0f172a;
+  --fg-chat-action-bar: #0f172a;
+  --bg-chat-action-bar: #0f172a;
+  --border-chat-action-bar: #0f172a;
+  --fg-reply-indicator: #0f172a;
+  --bg-reply-indicator: #0f172a;
+  --fg-text-mention: #0f172a;
+  --fg-text-meta: #0f172a;
+  --bg-status-tooltip: #0f172a;
+  --fg-status-tooltip: #0f172a;
+  --border-status-tooltip: #0f172a;
+
+  
+}
+
+[data-theme="forest"] {
+  --bg-primary: #0b1f1a;
+  --bg-secondary: #12332a;
+  --text-primary: #d1fae5;
+  --accent: #10b981;
+}

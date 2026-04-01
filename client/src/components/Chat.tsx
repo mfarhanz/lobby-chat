@@ -9,8 +9,8 @@ import { useChatUpload } from "../hooks/useChatUpload";
 import { useChatMention } from "../hooks/useChatMention";
 import { useCurrentDay } from "../hooks/useCurrentDay";
 import { useTurnstile } from "../hooks/useTurnstile";
-import { validateMedia } from "../utils/media";
-import { PLACEHOLDER_IMG } from "../constants/chat";
+import { compressMedia, validateMedia } from "../utils/media";
+import { MAX_UPLOADS_PER_MESSAGE, PLACEHOLDER_IMG } from "../constants/chat";
 import { useChatSend } from "../hooks/useChatSend";
 import { IconButton } from "./IconButton";
 import { EditIcon } from "./icons/EditIcon";
@@ -24,11 +24,12 @@ import { Spinner } from "./Spinner";
 import { usePaste } from "../hooks/usePaste";
 import { UsernameModal } from "./UsernameModal";
 import { useInactivityCheck } from "../hooks/useInactivityCheck";
-import type { MessageActionData, FileData, MessageData, SendPayload, DrawerAction, PasteResult, UserIdentity } from "../types/chat";
+import type { MessageActionData, FileData, MessageData, DrawerAction, PasteResult, UserIdentity, SendIntentPayload, ReplyData, CancelToken, MediaValidationResult } from "../types/chat";
 import { AnimatePresence, motion } from "motion/react";
 import { EmojiDrawer } from "./EmojiDrawer";
 import { SendIcon } from "./icons/SendIcon";
 import { KeyboardIcon } from "./icons/KeyboardIcon";
+import { getSecureRandom } from "../utils/random";
 
 export interface ChatProps {
     user: UserIdentity | undefined,
@@ -37,7 +38,12 @@ export interface ChatProps {
     messageOrder: string[];
     connected: boolean;
     startChat: (token?: string) => void;
-    sendMessage: (msg: SendPayload) => void;
+    sendIntent: (
+        msg: SendIntentPayload,
+        textBody: string,
+        files: FileData[],
+        replyTo?: ReplyData
+    ) => Promise<void>;
     editMessage: (messageId: string, text: string) => void;
     deleteMessage: (messageId: string) => void;
     addReaction: (messageId: string, emoji: string) => void;
@@ -55,7 +61,7 @@ export const Chat = memo(function Chat({
     messageOrder,
     connected,
     startChat,
-    sendMessage,
+    sendIntent,
     editMessage,
     deleteMessage,
     addReaction,
@@ -114,7 +120,7 @@ export const Chat = memo(function Chat({
     const {
         handleSend
     } = useChatSend({
-        sendMessage,
+        sendIntent,
         editMessage,
         cleanupPreviewUrls,
         uploadsRef,
@@ -269,30 +275,101 @@ export const Chat = memo(function Chat({
 
     const onSend = useCallback(async () => {
         if (!textareaRef.current) return;
+        if (!showEmojiPicker) textareaRef.current.focus();  // keep textarea focused only if emoji drawer not open
+
+        // Wait until all uploads are ready
+        const allReady = () => uploads.every(u => u.file || u.url === PLACEHOLDER_IMG);
+        if (!allReady()) {
+            console.warn("Please wait for uploads to finish processing.");
+            return;
+        }
+
         await handleSend();
 
         // reset local states
         setEmbed(null);
         setUploads([]);
         textareaRef.current.style.height = "auto";  // reset textarea height
-        if (!showEmojiPicker) textareaRef.current.focus();  // keep textarea focused only if emoji drawer not open
-    }, [handleSend, showEmojiPicker, setEmbed, setUploads]);
+    }, [uploads, handleSend, showEmojiPicker, setEmbed, setUploads]);
 
-    const pasteCallback = useCallback((result: PasteResult) => {
+    const generateThumbnailAndUpload = useCallback(async (id: number, file: File, token: CancelToken) => {
+        const processed = await compressMedia(
+            file,
+            {
+                cancelToken: token,
+                onProgress: (p) => {
+                    setUploads(prev =>
+                        prev.map(u => u.id === id ? { ...u, progress: p } : u)
+                    );
+                }
+            }
+        );
+
+        let url: string | undefined;
+        let result: MediaValidationResult | undefined;
+        if (processed) {
+            url = URL.createObjectURL(processed);
+            result = await validateMedia(url, processed);
+            if (!result.ok) {
+                URL.revokeObjectURL(url);
+                url = undefined;
+            }
+        }
+
+        setUploads(prev =>
+            prev.map(item => {
+                if (item.id !== id) return item;
+                // if we have a valid processed file and validation passed
+                if (processed && result?.ok && url) {
+                    return { id, file: processed, url };
+                }
+                // otherwise, use placeholder
+                return { id, url: PLACEHOLDER_IMG };
+            })
+        );
+    }, [setUploads]);
+
+    const processUploads = useCallback(async (files: File[]) => {
+        const fileItems = files.map(file => ({
+            file,
+            id: getSecureRandom(),                          // temporary upload ids/indexes
+            token: { cancelled: false } as CancelToken      // cancellation tokens
+        }));
+
+        // add placeholders (create thumbnails immediately)
+        setUploads(prev => {
+            const placeholders = fileItems.map(({ id, token }) => ({
+                id,
+                progress: 0,
+                cancelToken: token
+            }));
+            return [...prev, ...placeholders].slice(0, MAX_UPLOADS_PER_MESSAGE);
+        });
+
+        // Process images in parallel (pica works fine in parallel)
+        const images = fileItems.filter(f => f.file.type !== "image/gif" && !f.token.cancelled);
+        await Promise.all(
+            images.map(async f => await generateThumbnailAndUpload(f.id, f.file, f.token))
+        );
+
+        // Process GIFs sequentially (ffmpeg does not work well with multithreading)
+        const gifs = fileItems.filter(f => f.file.type === "image/gif" && !f.token.cancelled);
+        for (const f of gifs) {
+            await generateThumbnailAndUpload(f.id, f.file, f.token);
+        }
+    }, [setUploads, generateThumbnailAndUpload]);
+
+    const pasteCallback = useCallback(async (result: PasteResult) => {
         if (result) {
             switch (result.type) {
                 case "image":
-                    if (result.file) {          // if its a local file on device that was pasted
-                        setUploads(prev => {
-                            const combined: FileData[] = [
-                                ...prev,
-                                ...(result.file ? [{ file: result.file, url: result.url }] : [])
-                            ];
-                            return combined.slice(0, 4);
-                        });
-                    } else setEmbed(result.url);
+                    if (result.file) {          // if its a local file on device or image blob that was copy-pasted
+                        await processUploads([result.file]);
+                    } else {
+                        setEmbed(result.url ?? null);
+                    }
                     break;
-                case "youtube":
+                case "youtube":     // TODO
                     console.log("youtube URL detected:", result);
                     break;
                 case "spotify":
@@ -311,7 +388,7 @@ export const Chat = memo(function Chat({
         else {
             console.log("Normal text pasted", result);
         }
-    }, [setUploads, setEmbed]);
+    }, [setEmbed, processUploads]);
 
     // throttled onScroll internal handler
     const handleScroll = useCallback((scrollOffset: number) => {
@@ -337,26 +414,11 @@ export const Chat = memo(function Chat({
     }, []);
 
     const handleImageSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files ?? []);
-        if (!files.length) return;
-
-        const newPreviews = await Promise.all(files.map(async (file) => {
-            const url = URL.createObjectURL(file);
-            const result = await validateMedia(url, file);
-            if (!result.ok) {
-                URL.revokeObjectURL(url);
-                return null; // skip invalid
-            }
-            return { file, url };
-        }));
-
-        setUploads(prev => {
-            const combined = [...prev, ...newPreviews.filter((x): x is FileData => x !== null)];
-            return combined.slice(0, 4);
-        });
+        const files = Array.from(e.target.files ?? []).slice(0, MAX_UPLOADS_PER_MESSAGE - uploads.length);
+        if (files.length) await processUploads(files);
 
         e.target.value = "";
-    }, [setUploads]);
+    }, [uploads, processUploads]);
 
     const handleImageError = useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
         const el = e.currentTarget;
@@ -377,6 +439,18 @@ export const Chat = memo(function Chat({
         setShowEmojiPicker(false);
         if (window.history.state?.emojiDrawer) window.history.back();
     }, []);
+
+//     useEffect(() => {
+//     const handleBack = (e: unknown) => {
+//         console.log("Back button pressed", window.history.state);
+//     };
+
+//     window.addEventListener("popstate", handleBack);
+
+//     return () => {
+//         window.removeEventListener("popstate", handleBack);
+//     };
+// }, []);
 
     const handleEmojiButtonToggle = useCallback(() => {
         setTimeout(() => setShowEmojiPicker(v => !v), 100);
@@ -429,6 +503,11 @@ export const Chat = memo(function Chat({
     }, []);
 
     const onCopyMessage = useCallback((m: MessageData) => {
+        if (!navigator?.clipboard?.writeText) {
+            console.warn("Clipboard API not available");
+            return;
+        }
+
         navigator.clipboard.writeText(m.text);
         if (!TOUCH_DEVICE) {
             setCopydId(m.id);
@@ -602,13 +681,16 @@ export const Chat = memo(function Chat({
                                 />
                             )}
 
-                            {uploads.map(({ url }, index) => (
+                            {uploads.map((upload) => (
                                 <Thumbnail
-                                    key={url}
-                                    src={url}
+                                    key={upload.id}
+                                    src={upload.url}
+                                    progress={upload.progress}
                                     onRemove={() => {
-                                        URL.revokeObjectURL(url);
-                                        setUploads(prev => prev.filter((_, i) => i !== index));
+                                        if (upload.url) URL.revokeObjectURL(upload.url);
+                                        if (upload.cancelToken) upload.cancelToken.cancelled = true;
+
+                                        setUploads(prev => prev.filter(u => u.id !== upload.id));
                                     }}
                                 />
                             ))}

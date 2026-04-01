@@ -1,13 +1,13 @@
 export interface UserMeta {
-  username: string;
-  userHandle: string;
-  userCode: string;       // discriminator for users with the same name
-  messages: MessageMeta[];
-  joinedAt: number;
-  messagesToday: number;
-  imagesToday: number;
-  recentSends: number[];
-  device: string;
+    username: string;
+    userHandle: string;
+    userCode: string;       // discriminator for users with the same name
+    messages: MessageMeta[];
+    joinedAt: number;
+    messagesToday: number;
+    imagesToday: number;
+    recentSends: number[];
+    device: string;
 };
 
 export interface IpMeta {
@@ -16,14 +16,28 @@ export interface IpMeta {
 };
 
 export interface MessageMeta {
-  id: string;
-  createdAt: number;
+    id: string;
+    createdAt: number;
 };
 
 export interface MediaMeta {
-  id: string;
-  key: string;
-  url: string;
-  mime: string;
-  size: number;
+    id: string;
+    key: string;
+    mime: string;
+    size: number;
 };
+
+export interface UploadMeta {
+    id: string;
+    key: string;
+    url: string;
+    type: "text" | "image";
+}
+
+export interface ReplyMeta {
+    id: string;
+    userId: {
+        name: string;
+        handle: string;
+    };
+}

@@ -15,7 +15,7 @@ export default function App() {
         messages,
         messageOrder,
         startChat,
-        sendMessage,
+        sendIntent,
         editMessage,
         deleteMessage,
         addReaction,
@@ -70,7 +70,7 @@ export default function App() {
                     messageOrder={messageOrder}
                     connected={connected}
                     startChat={startChat}
-                    sendMessage={sendMessage}
+                    sendIntent={sendIntent}
                     editMessage={editMessage}
                     deleteMessage={deleteMessage}
                     addReaction={addReaction}

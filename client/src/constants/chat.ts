@@ -1,7 +1,15 @@
-export const MAX_FILE_SIZE = 20 * 1024 * 1024;
+export const MAX_IMAGE_UPLOAD_SIZE = 200 * 1024;
+export const MAX_IMAGE_UPLOAD_DIMS = 1024;
+export const MAX_GIF_UPLOAD_SIZE = 250 * 1024;
+export const MAX_GIF_UPLOAD_DIMS = 480;
+export const MAX_FILE_UPLOAD_SIZE = 300 * 1024;
+export const MAX_ACCEPTED_FILE_SIZE = 60 * 1024 * 1024;
 export const MAX_PIXEL_COUNT = 20_000_000;
+export const MAX_UPLOADS_PER_MESSAGE = 4;
 export const MAX_MESSAGE_REACTIONS = 20;
-export const PLACEHOLDER_IMG = "https://savethefrogs.com/wp-content/uploads/placeholder-image-blue-landscape.png";
+export const USERNAME_MAX_LENGTH = 30;
 export const INACTIVE_WARNING_TIME = 25 * 60 * 1000;
 export const INACTIVE_DISCONNECT_TIME = 30 * 60 * 1000;
 export const INACTIVE_CHECK_INTERVAL = 60 * 1000;
+export const SEND_MESSAGE_TIMEOUT = 1500;   // ms
+export const PLACEHOLDER_IMG = "https://savethefrogs.com/wp-content/uploads/placeholder-image-blue-landscape.png";  // random image to show error

@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ServerToClientEvents, ClientToServerEvents } from "../types/socket";
-import type { MessageData, UserMeta, SendPayload, SessionUserStatsMeta, UserIdentity } from "../types/chat";
-import { MAX_MESSAGE_REACTIONS } from "../constants/chat";
+import type {
+    MessageData, MessageMeta, UserMeta, SendPayload, SessionUserStatsMeta, UserIdentity,
+    SendIntentPayload, ReplyData, FileData, UploadAuthorization, UploadMeta, MediaMeta
+} from "../types/chat";
+import { MAX_MESSAGE_REACTIONS, SEND_MESSAGE_TIMEOUT } from "../constants/chat";
 import { LocalMessages } from "../data/localMessages";
+import { uploadToS3 } from "../utils/media";
 
 export function useChat() {
     const [messages, setMessages] = useState<Map<string, MessageData>>(new Map());
@@ -13,11 +17,15 @@ export function useChat() {
     const [connected, setConnected] = useState(false);
     const [userId, setUserId] = useState<UserIdentity>();
     const [users, setUsers] = useState<UserMeta[]>([]);
-    const [socket, setSocket] = useState<Socket<
-        ServerToClientEvents,
-        ClientToServerEvents
-    > | null>(null);
-    
+    const [socket, setSocket] = useState<Socket<ServerToClientEvents, ClientToServerEvents> | null>(null);
+
+    const pendingTextRef = useRef<string | null>(null);
+    const pendingFilesRef = useRef<FileData[] | null>(null);
+    const pendingReplyRef = useRef<ReplyData | undefined>(undefined);
+    const pendingResolveRef = useRef<(() => void) | undefined>(undefined);
+
+    const CDN = import.meta.env.VITE_CLOUDFRONT_URL;
+
     const startChat = useCallback((username?: string, turnstileToken?: string) => {
         if (socket) return;
 
@@ -47,11 +55,48 @@ export function useChat() {
         setMessageOrder(prev => [...prev, id]);
     }, []);
 
+    const sendIntent = useCallback((
+        payload: SendIntentPayload,
+        text: string,
+        files: FileData[],
+        replyTo?: ReplyData,
+    ): Promise<void> => {
+        return new Promise((resolve) => {
+            console.log("users wants to send:", payload);
+            const hasText = !!payload.textLength;
+            const hasFiles = !!payload.files?.length;
+            if (!hasText && !hasFiles) {
+                resolve(); // immediately resolve if nothing to send
+                return;
+            }
+
+            socket?.emit("send-intent", payload);
+
+            const timeout = setTimeout(() => {
+                console.warn("sending message timed out");
+                pendingResolveRef.current?.();
+                pendingResolveRef.current = undefined;
+            }, SEND_MESSAGE_TIMEOUT);
+
+            // store temp refs for use when server approves send
+            pendingTextRef.current = text;
+            pendingFilesRef.current = files;
+            pendingReplyRef.current = replyTo;
+            pendingResolveRef.current = () => {
+                clearTimeout(timeout);   // cancel the timeout if it hasn’t fired yet
+                resolve?.();      // then call the real resolve
+                pendingResolveRef.current = undefined
+            };
+        });
+    }, [socket]);
+
     const sendMessage = useCallback((payload: SendPayload) => {
-        const hasText = payload.text.trim().length > 0;
+        console.log("user approved to send:", payload);
+        if (!payload?.id) return;
+        const hasText = typeof payload.textKey === "string";
         const hasImages = !!payload.images?.length;
-        console.log(payload);
         if (!hasText && !hasImages) return;
+
         socket?.emit("send-message", payload);
     }, [socket]);
 
@@ -73,24 +118,129 @@ export function useChat() {
 
     useEffect(() => {
         if (!socket) return;
-        // socket.connect();
+        // socket.connect();    // no need to manual connect
 
-        const handleSendMessage = (msg: unknown) => {
+        const handleSendMessage = async (response: unknown) => {
+            const t3 = performance.now();
+            if (!response || typeof response !== "object") return;
+            console.log("server responded:", response);
+
+            const { id, uploads } = response as UploadAuthorization;
+
+            if (typeof id !== "string" || !Array.isArray(uploads)) return;
+
+            const text = pendingTextRef.current ?? "";
+            const files = pendingFilesRef.current ?? [];
+            const replyTo = pendingReplyRef.current;
+
+            if (!text && files.length === 0) return;
+            else {
+                const validatedUploads: UploadMeta[] = uploads.filter(u =>
+                    u &&
+                    typeof u === "object" &&
+                    typeof u.id === "string" &&
+                    typeof u.key === "string" &&
+                    typeof u.url === "string" &&
+                    (u.type === "text" || u.type === "image")
+                );
+
+                if (validatedUploads.length === 0) return;
+                const textUpload = validatedUploads.find(u => u.type === "text");
+                const imageUploads = validatedUploads.filter(u => u.type === "image");
+
+                let textKey: string | undefined;
+                if (text && textUpload) {
+                    const textBlob = new Blob(
+                        [JSON.stringify({ text })],
+                        { type: "application/json" }
+                    );
+                    const res = await uploadToS3(textBlob, textUpload);
+                    if (res) textKey = textUpload.key;
+                    else console.error(`Failed to upload text: ${textUpload.key}`);
+                }
+
+                let uploadedImages: MediaMeta[] | undefined;
+                if (files.length && imageUploads.length) {
+                    const validFiles = files.filter((f): f is FileData & { file: File } => !!f.file);
+                    const results = await Promise.all(
+                        validFiles.map(async (file, idx) => {
+                            const uploadMeta = imageUploads[idx];
+                            if (!uploadMeta) return null;
+
+                            const success = await uploadToS3(file.file, uploadMeta);
+                            if (!success) {
+                                console.error(`Failed to upload file: ${uploadMeta.key}`);
+                                return null;
+                            }
+
+                            return {
+                                id: uploadMeta.id,
+                                key: uploadMeta.key,
+                                mime: file.file.type,
+                                size: file.file.size,
+                            } as MediaMeta;
+                        })
+                    );
+                    // filter out any nulls
+                    uploadedImages = results.filter(Boolean) as MediaMeta[];
+                    if (uploadedImages.length === 0) uploadedImages = undefined;
+                }
+
+                const payload: SendPayload = {
+                    id,
+                    ...(textKey ? { textKey } : {}),
+                    ...(uploadedImages ? { images: uploadedImages } : {}),
+                    ...(replyTo ? { replyTo } : {})
+                };
+
+                sendMessage(payload);
+            }
+
+            pendingResolveRef.current?.();
+
+            pendingTextRef.current = null;
+            pendingFilesRef.current = [];
+            pendingReplyRef.current = undefined;
+            pendingResolveRef.current = undefined;
+
+            const t4 = performance.now();
+            console.log(`processing upload auth from server took: ${t4-t3}ms`);
+        };
+
+        const handleNewMessage = async (msg: unknown) => {
+            const t3 = performance.now();
             if (!msg || typeof msg !== "object") return;
 
-            const { id, user, text, timestamp, images, replyTo } = msg as MessageData;
+            console.log("server broadcasted to all:", msg);
+
+            const { id, user, textKey, timestamp, images, replyTo } = msg as MessageMeta;
 
             if (
+                typeof id !== "string" ||
                 typeof user !== "object" ||
-                typeof text !== "string" ||
                 typeof timestamp !== "number"
             ) return;
 
-            let validatedReplyTo: MessageData["replyTo"] | undefined;
+            let text = "";
+            if (typeof textKey === "string") {
+                try {
+                    const res = await fetch(`${CDN}/${textKey}`);   // get user text message from s3 bucket
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (typeof data?.text === "string") {
+                            text = data.text;
+                        }
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            }
+
+            let validatedReplyTo: MessageMeta["replyTo"] | undefined;
             if (
                 replyTo &&
                 typeof replyTo === "object" &&
-                typeof replyTo.id === "string" &&       // needed?
+                typeof replyTo.id === "string" &&
                 typeof replyTo.userId === "object"
             ) {
                 validatedReplyTo = {
@@ -99,29 +249,46 @@ export function useChat() {
                 };
             }
 
-            let validatedImages: MessageData['images'] | undefined;
+            let validatedImages: MessageMeta['images'] | undefined;
             if (Array.isArray(images)) {
                 validatedImages = images.filter(img =>
                     img &&
                     typeof img === "object" &&
                     typeof img.id === "string" &&
                     typeof img.key === "string" &&
-                    typeof img.url === "string" &&
                     typeof img.mime === "string" &&
                     typeof img.size === "number"
-                );
+                ).map(img => ({
+                    ...img,
+                    url: `${CDN}/${img.key}`,
+                }));
                 if (validatedImages.length === 0) validatedImages = undefined;
             }
 
             setMessages(prev => {
                 const newMap = new Map(prev);
-                newMap.set(id, { id, user, text, timestamp, replyTo: validatedReplyTo, images: validatedImages });
+                newMap.set(id, {
+                    id,
+                    user,
+                    text,
+                    timestamp,
+                    replyTo: validatedReplyTo,
+                    images: validatedImages
+                });
                 return newMap;
             });
             setMessageOrder(prev => [...prev, id]);
 
+            const t2 = performance.now();
+            console.log("end: ", t2);
+
+            console.log(`broadcasting to all took: ${t2-t3}ms`);
+
             // update user's stats in stats map whenever a new message is sent
-            const oldStats = userStats.current[user.handle] ?? { messageCount: 0, lastActive: 0 };
+            const oldStats = userStats.current[user.handle] ?? {
+                messageCount: 0,
+                lastActive: 0
+            };
             userStats.current[user.handle] = {
                 messageCount: oldStats.messageCount + 1,
                 lastActive: timestamp,
@@ -199,7 +366,8 @@ export function useChat() {
             setUserId(user);
             sendLocalSystemMessage(LocalMessages.welcome(user.name));
         });
-        socket.on("new-message", handleSendMessage);
+        socket.on("send-approval", handleSendMessage);
+        socket.on("new-message", handleNewMessage);
         socket.on("delete-message-public", handleDeleteMessage);
         socket.on("edit-message", handleEditMessage);
         socket.on("add-reaction", handleAddReaction);
@@ -213,6 +381,9 @@ export function useChat() {
         });
         socket.on("image-limit", () => {
             sendLocalSystemMessage(LocalMessages.image_limit());
+        });
+        socket.on("server-image-limit", () => {
+            sendLocalSystemMessage(LocalMessages.server_image_limit());
         });
         socket.on("kicked", (reason) => {
             sendLocalSystemMessage(LocalMessages.kicked(reason ?? null));
@@ -231,11 +402,15 @@ export function useChat() {
         });
 
         return () => {
-            socket.off("new-message", handleSendMessage);
+            socket.off("send-approval", handleSendMessage);
+            socket.off("new-message", handleNewMessage);
             socket.off("delete-message-public", handleDeleteMessage);
             socket.off("active-connections", setUserCount);
             socket.off("users-update");
             socket.off("user-confirm");
+            socket.off("image-limit");
+            socket.off("server-limit");
+            socket.off("server-image-limit");
             socket.off("kicked");
             socket.off("warn-kick");
             socket.off("connect");
@@ -259,7 +434,7 @@ export function useChat() {
         messages,
         messageOrder,
         startChat,
-        sendMessage,
+        sendIntent,
         editMessage,
         deleteMessage,
         addReaction,

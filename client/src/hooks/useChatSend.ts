@@ -1,9 +1,13 @@
 import { useCallback } from "react";
-import type { MessageActionData, FileData, SendPayload } from "../types/chat";
-import { fakeUploadFiles } from "../utils/media";
+import type { MessageActionData, FileData, SendIntentPayload, ReplyData } from "../types/chat";
 
 interface UseChatSendProps {
-    sendMessage: (payload: SendPayload) => void;
+    sendIntent: (
+        payload: SendIntentPayload,
+        textBody: string,
+        files: FileData[],
+        replyTo?: ReplyData,
+    ) => Promise<void>;
     editMessage: (id: string, text: string) => void;
     cleanupPreviewUrls: () => void;
     uploadsRef: React.MutableRefObject<FileData[]>;
@@ -15,7 +19,7 @@ interface UseChatSendProps {
 };
 
 export function useChatSend({
-    sendMessage,
+    sendIntent,
     editMessage,
     cleanupPreviewUrls,
     uploadsRef,
@@ -26,61 +30,64 @@ export function useChatSend({
     setAction,
 }: UseChatSendProps) {
 
+    const cleanupAfterSend = useCallback(() => {
+        cleanupPreviewUrls();
+        // reset
+        setInput("");
+        setAction(null);
+        uploadsRef.current = [];
+    }, [uploadsRef, setInput, setAction, cleanupPreviewUrls]);
+
     const handleSend = useCallback(async () => {
+        const t1 = performance.now();
+        console.log("start: ", t1);
         const hasText = !!input.trim();
-        const hasValidEmbed = !!embed;
+        const hasEmbed = !!embed;
         const hasUploads = uploadsRef.current.length > 0;
 
         // if no text and either no embed exists, block sending
-        if (!hasText && !hasValidEmbed && !hasUploads) return;
+        if (!hasText && !hasEmbed && !hasUploads) return;
 
         // format text
         let sendText = input;
-        if (embed) sendText += `\n\n![](${embed})`;     // append any image/gif embeds - this will rendered via markdown
-        sendText = sendText.replace(    // format pings differently from text
+        if (hasEmbed) sendText += `\n\n![](${embed})`;     // append any image/gif embeds - this will rendered via markdown
+        sendText = sendText.replace(        // format pings differently from text
             /(^|[\s.,;:!?])(?<!`)@(\S+)/g,
             '$1[`@$2`](#ping)'
         );
-
-        // send any attached files to temporary online storage
-        const files = uploadsRef.current.map(u => u.file);
-        const images = files.length
-            ? await fakeUploadFiles(files)
-            : undefined;
 
         // if editing message, don't send anything, just modify the existing chat message
         if (action?.type === "edit" && action.messageId) {
             editMessage(action.messageId, sendText);
         } else {
-            const payload: SendPayload = {
-                text: sendText,
-                images,
-                ...(action?.type === "reply" && {
-                    replyTo: {                  // if replying to someone, create a reply object
-                        id: action.messageId,
-                        userId: action.userId
-                    }
-                })
-            };
+            const files = uploadsRef.current.map(u => u.file);
+            const payload: SendIntentPayload = {};
 
-            sendMessage(payload);
+            if (hasText || hasEmbed) {
+                payload.textLength = sendText.length;
+                payload.textBytes = new TextEncoder().encode(sendText).length;
+            }
+
+            if (files.length) {
+                payload.files = files
+                    .filter((f): f is File => !!f)
+                    .map(file => ({
+                        mime: file.type,
+                        size: file.size
+                    }));
+            }
+
+            // if replying to someone, additionally create a reply object
+            const replyTo = action?.type === "reply"
+                ? { id: action.messageId, userId: action.userId }
+                : undefined;
+
+            await sendIntent(payload, sendText, uploadsRef.current, replyTo);
         }
 
-        cleanupPreviewUrls();
-
-        // reset
-        setInput("");
-        setAction(null);
-        uploadsRef.current = [];
-    }, [sendMessage,
-        editMessage,
-        cleanupPreviewUrls,
-        uploadsRef,
-        embed,
-        input,
-        setInput,
-        action,
-        setAction,]);
+        console.log("cleaning up");
+        cleanupAfterSend();
+    }, [embed, action, input, uploadsRef, editMessage, sendIntent, cleanupAfterSend]);
 
     return { handleSend };
 }

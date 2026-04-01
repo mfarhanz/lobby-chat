@@ -4,7 +4,7 @@ import { detectGithub, detectSpotify, detectTwitter, detectYouTube, getContent }
 import type { PasteResult } from "../types/chat";
 
 interface UsePasteProps {
-    callback: (src: PasteResult) => void;
+    callback: (src: PasteResult) => void | Promise<void>;
 };
 
 export function usePaste({ callback }: UsePasteProps) {
@@ -36,8 +36,8 @@ export function usePaste({ callback }: UsePasteProps) {
                         if (cleanUrl.protocol !== 'http:' && cleanUrl.protocol !== 'https:') return;
                         const src = cleanUrl.href; // sanitized url
                         const result = await validateMedia(src);
-                        if (result.ok) callback({ type: "image", url: src });
-                        else callback({ type: "media", error: result.reason });
+                        if (result.ok) await callback({ type: "image", url: src });
+                        else await callback({ type: "media", error: result.reason });
                         return;
                     } catch (err) {
                         console.warn("Clipboard media rejected:", err);
@@ -53,7 +53,7 @@ export function usePaste({ callback }: UsePasteProps) {
                     for (const detect of detectors) {
                         const result = detect(text);
                         if (result) {
-                            callback(result);
+                            await callback(result);
                             return;
                         }
                     }
@@ -65,20 +65,12 @@ export function usePaste({ callback }: UsePasteProps) {
                 const file = item.getAsFile();
                 if (!file) continue;
 
-                const url = URL.createObjectURL(file);
-                const result = await validateMedia(url);
-                if (result.ok) {
-                    callback({ type: "image", url, file });
-                }
-                else {
-                    URL.revokeObjectURL(url);
-                    callback({ type: "media", error: result.reason });
-                }
+                await callback({ type: "image", file });        // handle validation/compression in Chat
                 return;
             }
         }
 
-        callback(null);
+        await callback(null);
     }, [callback]);
 
     return { handlePaste };

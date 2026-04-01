@@ -1,3 +1,15 @@
+export interface MessageMeta {
+    id: string;
+    user: UserIdentity;
+    textKey: string;
+    timestamp: number;
+    edited?: boolean;
+    system?: boolean;
+    replyTo?: ReplyData
+    reactions?: MessageReactionData[];
+    images?: MediaMeta[];
+};
+
 export interface MessageData {
     id: string;
     user: UserIdentity;
@@ -11,8 +23,11 @@ export interface MessageData {
 };
 
 export interface FileData {
-    file: File;
-    url: string;
+    id: number;
+    file?: File;
+    url?: string;
+    progress?: number;
+    cancelToken?: CancelToken;
 };
 
 export interface ReplyData {
@@ -35,23 +50,45 @@ export interface UserMeta {
 
 export interface MediaMeta {
     id: string;
-    key: string;         // object key in bucket
-    url: string;
+    key: string;
     mime: string;
     size: number;
+    url?: string;
 };
+
+export interface UploadMeta {
+    id: string;
+    key: string;
+    url: string;
+    type: "text" | "image";
+}
+
+export interface SendIntentPayload {
+    textLength?: number;
+    textBytes?: number;
+    files?: {
+        mime: string;
+        size: number;
+    }[];
+}
+
+export interface SendPayload {
+    id: string;
+    textKey?: string;
+    images?: MediaMeta[];
+    replyTo?: ReplyData;
+};
+
+export interface UploadAuthorization {
+    id: string,
+    uploads?: UploadMeta[];
+}
 
 export interface SessionUserStatsMeta {
     messageCount: number;
     joinedAt?: number;
     lastActive?: number;
 }
-
-export interface SendPayload {
-    text: string;
-    images?: MediaMeta[];
-    replyTo?: ReplyData;
-};
 
 export interface DrawerAction {
     key: string;
@@ -77,12 +114,16 @@ export interface MessageReactionData {
     userIds: string[];
 };
 
+export interface CancelToken {
+    cancelled: boolean;
+}
+
 export type MediaValidationResult =
     | { ok: true }
     | { ok: false; reason: number };
 
 export type PasteResult =
-    | { type: "image"; url: string; file?: File }
+    | { type: "image"; url?: string; file?: File }
     | { type: "youtube"; videoId: string; url: string; thumbnail: string }
     | { type: "spotify"; url: string; thumbnail: string; title?: string }
     | { type: "twitter"; url: string; text?: string }

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { generateUsernameSet } from "../utils/username";
 import { ChevronIcon } from "./icons/ChevronIcon";
+import { USERNAME_MAX_LENGTH } from "../constants/chat";
 
 export function UsernameModal({ onSubmit }: { onSubmit: (name: string) => void }) {
     const [names, setNames] = useState(() => generateUsernameSet());
@@ -38,7 +39,7 @@ export function UsernameModal({ onSubmit }: { onSubmit: (name: string) => void }
                             value={username ?? ""}
                             onChange={(e) => setUsername(e.target.value)}
                             placeholder="Type or choose a name..."
-                            maxLength={30}
+                            maxLength={USERNAME_MAX_LENGTH}
                             className="block w-full p-1 text-zinc-100 font-semibold whitespace-nowrap outline-none rounded border border-zinc-600"
                         />
                     </div>

@@ -22,10 +22,6 @@
     @apply bg-zinc-950 text-zinc-100 antialiased text-base;
   }
 
-  #root {
-    /* min-height: 100vh; */
-  }
-
   #turnstile-modal {
     box-sizing: content-box;
   }
@@ -98,7 +94,8 @@ body {
   }
 
   .app-shell {
-    @apply min-h-dvh flex flex-col h-dvh;   /* don't use screen! using dvh fits page content in mobile views as well */
+    @apply min-h-dvh flex flex-col h-dvh;
+    /* don't use screen! using dvh fits page content in mobile views as well */
   }
 
   .app-header {
@@ -132,7 +129,6 @@ body {
 
   .user-item {
     @apply grid font-mono rounded-md px-3 py-2 text-zinc-200 bg-zinc-700/70 overflow-hidden;
-
     grid-template-rows: auto 0fr;
     transition: grid-template-rows 300ms ease-out;
     will-change: grid-template-rows;
@@ -220,7 +216,6 @@ body {
     @apply w-full max-h-46 px-4 -mb-1.5;
     @apply bg-zinc-800 border-zinc-700;
     @apply border border-b-0 rounded-t-lg;
-
   }
 
   .chat-message-image-single {

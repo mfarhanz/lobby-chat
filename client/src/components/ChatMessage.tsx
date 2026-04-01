@@ -225,7 +225,7 @@ export const ChatMessage = memo(function ChatMessage({
                             <SkeletonImage
                                 key={img.id}
                                 src={img.url}
-                                onClick={() => onImageClick(img.url)}
+                                onClick={() => onImageClick(img.url ?? null)}
                                 onError={onImageError}
                                 className="chat-message-image-multi"
                             />
