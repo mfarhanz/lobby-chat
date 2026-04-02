@@ -257,7 +257,7 @@ chat.on("connection", (socket) => {
             uploads: uploads.length ? uploads : undefined,
         });
     });
-    socket.on("send-message", (payload) => {
+    socket.on("send-message", async (payload) => {
         if (totalMessagesToday >= CFG.MAX_DAILY_MESSAGES) {
             socket.emit("server-limit", hoursUntilReset());
             disconnectSocket(socket);
@@ -310,9 +310,16 @@ chat.on("connection", (socket) => {
         else if (user.recentSends.length >= CFG.SPAM_THRESHOLD - 2) {
             socket.emit("warn-kick");
         }
-        user.messages.push({
-            id,
+        const textId = textKey?.split("/").at(-1) ?? null;
+        const imageIds = validatedImages && validatedImages.length > 0
+            ? validatedImages.map(img => img.id)
+            : null;
+        await (0, aws_1.putMessage)({
+            socketId: socket.id,
             createdAt: now,
+            messageId: id,
+            ...(textId && { textId }),
+            ...(imageIds && { imageIds })
         });
         user.messagesToday++;
         totalMessagesToday++;
@@ -326,20 +333,19 @@ chat.on("connection", (socket) => {
             replyTo: validatedReplyTo,
         });
     });
-    socket.on("delete-message", (messageId) => {
+    socket.on("delete-message", async (messageId) => {
         if (typeof messageId !== "string")
             return;
         const user = usersBySocketId[socket.id];
         if (!user)
             return;
-        const msgIndex = user.messages.findIndex(m => m.id === messageId);
-        if (msgIndex === -1) {
-            // Message does not belong to this user
-            return;
+        try {
+            await (0, aws_1.deleteMessage)(socket.id, messageId);
+            chat.emit("delete-message-public", messageId);
         }
-        // Remove this message from the user's list
-        user.messages.splice(msgIndex, 1);
-        chat.emit("delete-message-public", messageId);
+        catch (err) {
+            logger_1.logger.warn("Failed to delete message from DynamoDB: ", err);
+        }
     });
     socket.on("add-reaction", (msg) => {
         if (!msg || typeof msg !== "object")
@@ -357,7 +363,7 @@ chat.on("connection", (socket) => {
             user: user.userHandle
         });
     });
-    socket.on("edit-message", (msg) => {
+    socket.on("edit-message", async (msg) => {
         if (!msg || typeof msg !== "object")
             return;
         const { messageId, text } = msg;
@@ -367,11 +373,10 @@ chat.on("connection", (socket) => {
         const user = usersBySocketId[socket.id];
         if (!user)
             return;
-        const msgIndex = user.messages.findIndex(m => m.id === messageId);
-        if (msgIndex === -1) {
-            // message does not belong to this user
-            return;
-        }
+        const messages = await (0, aws_1.getMessagesBySocket)(socket.id);
+        const messageExists = messages.some(m => m.messageId === messageId);
+        if (!messageExists)
+            return; // message does not belong to this user
         const trimmed = text.trim();
         // prevent empty message
         if (!trimmed)
@@ -394,13 +399,19 @@ chat.on("connection", (socket) => {
         disconnectSocket(socket);
     });
 });
-function onClientDisconnect(socket) {
+async function onClientDisconnect(socket) {
     if (socket._disconnected)
         return; // already handled, nothing to do
     socket._disconnected = true;
     activeConnections--;
     const ip = socket._ip;
     delete usersBySocketId[socket.id];
+    try {
+        await (0, aws_1.deleteMessagesBySocket)(socket.id);
+    }
+    catch (err) {
+        logger_1.logger.warn(`Failed to delete messages for socket ${socket.id}:`, err);
+    }
     broadcastActiveConnections();
     broadcastUsers();
     if (ip && ipCache[ip]) {

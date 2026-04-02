@@ -20,6 +20,12 @@ export interface MessageMeta {
     createdAt: number;
 };
 
+// primary key structure in DB
+export interface MessageKey {
+    socketId: string;
+    messageId: string;
+}
+
 export interface MediaMeta {
     id: string;
     key: string;

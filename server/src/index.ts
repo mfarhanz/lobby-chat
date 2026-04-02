@@ -3,7 +3,7 @@ import http from "http";
 import { nanoid } from "nanoid";
 import { LRUCache } from "lru-cache";
 import { logger } from "./logger";
-import { createUploadUrl } from "./aws";
+import { createUploadUrl, deleteMessage, deleteMessagesBySocket, getMessagesBySocket, putMessage } from "./aws";
 import { Server, Socket } from "socket.io";
 import { UserMeta, MediaMeta, IpMeta, UploadMeta, ReplyMeta } from "./types/meta";
 import { SERVER_MESSAGES as SV } from "./constants";
@@ -252,7 +252,7 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
         });
     });
 
-    socket.on("send-message", (payload: unknown) => {
+    socket.on("send-message", async (payload: unknown) => {
         if (totalMessagesToday >= CFG.MAX_DAILY_MESSAGES) {
             socket.emit("server-limit", hoursUntilReset());
             disconnectSocket(socket);
@@ -319,9 +319,17 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
             socket.emit("warn-kick");
         }
 
-        user.messages.push({    // for delete purposes - store in database later
-            id,
+        const textId = textKey?.split("/").at(-1) ?? null;
+        const imageIds = validatedImages && validatedImages.length > 0
+            ? validatedImages.map(img => img.id)
+            : null;
+
+        await putMessage({
+            socketId: socket.id,
             createdAt: now,
+            messageId: id,
+            ...(textId && { textId }),
+            ...(imageIds && { imageIds })
         });
 
         user.messagesToday++;
@@ -338,22 +346,18 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
         });
     });
 
-    socket.on("delete-message", (messageId: unknown) => {
+    socket.on("delete-message", async (messageId: unknown) => {
         if (typeof messageId !== "string") return;
 
         const user = usersBySocketId[socket.id];
         if (!user) return;
 
-        const msgIndex = user.messages.findIndex(m => m.id === messageId);
-        if (msgIndex === -1) {
-            // Message does not belong to this user
-            return;
+        try {
+            await deleteMessage(socket.id, messageId);
+            chat.emit("delete-message-public", messageId);
+        } catch (err) {
+            logger.warn("Failed to delete message from DynamoDB: ", err);
         }
-
-        // Remove this message from the user's list
-        user.messages.splice(msgIndex, 1);
-
-        chat.emit("delete-message-public", messageId);
     });
 
     socket.on("add-reaction", (msg: unknown) => {
@@ -375,7 +379,7 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
         });
     });
 
-    socket.on("edit-message", (msg: unknown) => {
+    socket.on("edit-message", async (msg: unknown) => {
         if (!msg || typeof msg !== "object") return;
 
         const { messageId, text } = msg as { messageId: string; text: string };
@@ -387,11 +391,9 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
         const user = usersBySocketId[socket.id];
         if (!user) return;
 
-        const msgIndex = user.messages.findIndex(m => m.id === messageId);
-        if (msgIndex === -1) {
-            // message does not belong to this user
-            return;
-        }
+        const messages = await getMessagesBySocket(socket.id);
+        const messageExists = messages.some(m => m.messageId === messageId);
+        if (!messageExists) return;     // message does not belong to this user
 
         const trimmed = text.trim();
         // prevent empty message
@@ -417,12 +419,18 @@ chat.on("connection", (socket: Socket & { _ip?: string }) => {
     });
 });
 
-function onClientDisconnect(socket: Socket & { _disconnected?: boolean; _ip?: string }) {
+async function onClientDisconnect(socket: Socket & { _disconnected?: boolean; _ip?: string }) {
     if (socket._disconnected) return; // already handled, nothing to do
     socket._disconnected = true;
     activeConnections--;
     const ip = socket._ip;
     delete usersBySocketId[socket.id];
+
+    try {
+        await deleteMessagesBySocket(socket.id);
+    } catch (err) {
+        logger.warn(`Failed to delete messages for socket ${socket.id}:`, err);
+    }
 
     broadcastActiveConnections();
     broadcastUsers();

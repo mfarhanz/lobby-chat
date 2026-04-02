@@ -24,8 +24,11 @@ export const SPAM_TIME = 10000; // spam window in milliseconds
 
 export const UPLOAD_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp", "image/bmp", "image/gif", "image/x-icon"];
 
-// remember to adjust accordingly!
-export const AWS_REGION = process.env.AWS_REGION || "us-east-2";
+// remember to adjust accordingly! optional blanks left on purpose.
+export const AWS_REGION = process.env.AWS_REGION || "";
 export const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || "";
 export const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || "";
-export const S3_BUCKET = process.env.S3_BUCKET || "live-chat-storage";
+export const S3_BUCKET = process.env.S3_BUCKET || "";
+export const DYNAMODB_TABLE = process.env.DYNAMODB_TABLE || "";
+export const DYNAMODB_GSI = process.env.DYNAMODB_GSI || "";
+export const DYNAMODB_TTL_SECONDS = 7 * 24 * 60 * 60;
