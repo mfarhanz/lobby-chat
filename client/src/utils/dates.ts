@@ -16,7 +16,7 @@ export function formatTimestamp(ts: number, now: Date) {
     });
 
     if (isSameDay(date, now)) {
-        return `Today at ${time}`;
+        return `${time}`;
     }
 
     if (isSameDay(date, yesterday)) {

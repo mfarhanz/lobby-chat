@@ -23,6 +23,7 @@ export function UsernameModal({ onSubmit }: { onSubmit: (name: string) => void }
                                             ? "bg-zinc-600 font-semibold" 
                                             : "bg-zinc-700 hover:bg-zinc-600"}`}
                             onClick={() => setUsername(n)}
+                            onDoubleClick={() => onSubmit(n)}
                         >
                             {n}
                         </div>

@@ -23,6 +23,9 @@ const server = http.createServer(app);
 const io = new Server(server, {
     // path: "/socket",
     transports: ["polling", "websocket"],
+    perMessageDeflate: {
+        threshold: 2048 // only compress messages >2KB
+    },
     cors: {
         origin: allowedOrigins,
         methods: ["GET", "POST"],

@@ -39,8 +39,6 @@ export function useChatSend({
     }, [uploadsRef, setInput, setAction, cleanupPreviewUrls]);
 
     const handleSend = useCallback(async () => {
-        const t1 = performance.now();
-        console.log("start: ", t1);
         const hasText = !!input.trim();
         const hasEmbed = !!embed;
         const hasUploads = uploadsRef.current.length > 0;
@@ -85,7 +83,6 @@ export function useChatSend({
             await sendIntent(payload, sendText, uploadsRef.current, replyTo);
         }
 
-        console.log("cleaning up");
         cleanupAfterSend();
     }, [embed, action, input, uploadsRef, editMessage, sendIntent, cleanupAfterSend]);
 

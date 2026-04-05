@@ -59,7 +59,7 @@ export default function App() {
                 className="app-header text-title"
                 onClick={openUsersPanel}
             >
-                Live Chat
+                LobbyChat
             </header>
 
             <main className="app-main">

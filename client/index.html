@@ -2,24 +2,109 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Live Chat</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LobbyChat | Real-Time Live Chat</title>
+    <meta name="description"
+        content="LobbyChat is a real-time browser chat where users join a shared lobby and exchange messages instantly with others online. Fast, anonymous messaging built for live conversations with no signup required." />
+    <meta name="robots" content="index, follow" />
+    <link rel="icon" href="/favicon.ico" sizes="any">
+    <link rel="canonical" href="https://lobbychat.pages.dev/" />
+    <link rel="alternate" href="https://chat.mfarhanz.dev/" hreflang="x-default">
+    <link rel="alternate" href="https://lobbychat.pages.dev/" hreflang="x-default">
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="LobbyChat | Real-Time Live Chat">
+    <meta property="og:description"
+        content="Join a real-time public chat instantly. No accounts, no downloads. Fast, anonymous messaging in the browser.">
+    <meta property="og:url" content="https://lobbychat.pages.dev/">
+    <meta property="og:image" content="/preview.webp">
+    <meta property="og:site_name" content="LobbyChat">
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="LobbyChat | Real-Time Live Chat">
+    <meta name="twitter:description" content="Join a real-time public chat instantly. No signup required.">
+    <meta name="twitter:image" content="/preview.webp">
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "LobbyChat",
+        "url": "https://lobbychat.pages.dev/",
+        "sameAs": [
+            "https://lobbychat.pages.dev/",
+            "https://chat.mfarhanz.dev/"
+        ],
+        "description": "LobbyChat is a real-time browser chat where users join a shared lobby and exchange messages instantly, with fast and anonymous messaging and no signup required.",
+        "publisher": {
+            "@type": "Person",
+            "name": "Farhan Zia",
+            "url": "https://mfarhanz.dev",
+            "sameAs": [
+                "https://mfarhanz.dev",
+                "https://mfarhanz.pages.dev"
+            ]
+        }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "LobbyChat",
+        "alternateName": "Live Chat",
+        "description": "LobbyChat is a real-time browser chat where users join a shared lobby and exchange messages instantly. Fast, anonymous messaging built for live conversations with no signup required.",
+        "applicationCategory": "CommunicationApplication",
+        "url": "https://lobbychat.pages.dev/",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires JavaScript and modern browser",
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "LobbyChat",
+            "url": "https://lobbychat.pages.dev/"
+        },
+        "featureList": [
+            "Real-time messaging in browser",
+            "Instant lobby access",
+            "Anonymous participation by default",
+            "No account required",
+            "Send text, images and GIFs as messages",
+            "No user data is collected",
+            "Fast, WebSocket based messaging"
+        ],
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "author": {
+            "@type": "Person",
+            "name": "Farhan Zia",
+            "url": "https://mfarhanz.dev",
+            "sameAs": [
+                "https://mfarhanz.dev",
+                "https://mfarhanz.pages.dev"
+            ]
+        }
+    }
+    </script>
 
-  <!-- Cloudflare Turnstile -->
-  <link rel="preconnect" href="https://challenges.cloudflare.com" />
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad" async
-    defer></script>
-  <script>
-    window.onTurnstileLoad = function () {
-      window.turnstileReady = true;
-    };
-  </script>
+
+    <!-- Cloudflare Turnstile -->
+    <link rel="preconnect" href="https://challenges.cloudflare.com" />
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad" async
+        defer></script>
+    <script>
+        window.onTurnstileLoad = function () {
+            window.turnstileReady = true;
+        };
+    </script>
 </head>
 
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
 </body>
 
 </html>

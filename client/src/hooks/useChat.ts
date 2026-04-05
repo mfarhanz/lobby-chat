@@ -62,7 +62,6 @@ export function useChat() {
         replyTo?: ReplyData,
     ): Promise<void> => {
         return new Promise((resolve) => {
-            console.log("users wants to send:", payload);
             const hasText = !!payload.textLength;
             const hasFiles = !!payload.files?.length;
             if (!hasText && !hasFiles) {
@@ -91,7 +90,6 @@ export function useChat() {
     }, [socket]);
 
     const sendMessage = useCallback((payload: SendPayload) => {
-        console.log("user approved to send:", payload);
         if (!payload?.id) return;
         const hasText = typeof payload.textKey === "string";
         const hasImages = !!payload.images?.length;
@@ -121,9 +119,7 @@ export function useChat() {
         // socket.connect();    // no need to manual connect
 
         const handleSendMessage = async (response: unknown) => {
-            const t3 = performance.now();
             if (!response || typeof response !== "object") return;
-            console.log("server responded:", response);
 
             const { id, uploads } = response as UploadAuthorization;
 
@@ -202,16 +198,10 @@ export function useChat() {
             pendingFilesRef.current = [];
             pendingReplyRef.current = undefined;
             pendingResolveRef.current = undefined;
-
-            const t4 = performance.now();
-            console.log(`processing upload auth from server took: ${t4-t3}ms`);
         };
 
         const handleNewMessage = async (msg: unknown) => {
-            const t3 = performance.now();
             if (!msg || typeof msg !== "object") return;
-
-            console.log("server broadcasted to all:", msg);
 
             const { id, user, textKey, timestamp, images, replyTo } = msg as MessageMeta;
 
@@ -278,11 +268,6 @@ export function useChat() {
                 return newMap;
             });
             setMessageOrder(prev => [...prev, id]);
-
-            const t2 = performance.now();
-            console.log("end: ", t2);
-
-            console.log(`broadcasting to all took: ${t2-t3}ms`);
 
             // update user's stats in stats map whenever a new message is sent
             const oldStats = userStats.current[user.handle] ?? {
